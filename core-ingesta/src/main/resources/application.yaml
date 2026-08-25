@@ -1,0 +1,31 @@
+server:
+  port: 8081 # El puerto donde vivirá tu microservicio de ingesta
+
+spring:
+  application:
+    name: core-ingesta
+
+  # Configuración de tu Base de Datos PostgreSQL
+  datasource:
+    url: jdbc:postgresql://localhost:5432/calidad_aire_db
+    username: Administrador
+    password: 1234
+    driver-class-name: org.postgresql.Driver
+
+  # Configuración de Hibernate (JPA)
+  jpa:
+    hibernate:
+      ddl-auto: update # Crea o actualiza las tablas automáticamente al iniciar
+    show-sql: true # Útil en desarrollo para ver las consultas en la consola
+    properties:
+      hibernate:
+        format_sql: true
+
+# Configuración de nuestro Broker MQTT (Mosquitto)
+mqtt:
+  broker:
+    url: tcp://localhost:1883
+    client-id: backend-core-ingesta
+  topics:
+    normales: fog/lecturas/normales
+    criticas: fog/alertas/criticas
