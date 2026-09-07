@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.Message;
@@ -25,12 +26,15 @@ public class MqttSubscriberService {
     private LecturaNormalRepository lecturaRepository;
 
     @Autowired
+    private MotorReglasService motorReglasService;
+
+    @Autowired
     private AlertaCriticaRepository alertaCriticaRepository;
 
     @Autowired
     private NotificacionService notificacionService; // Placeholder para el Mes 2
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     // --- CANAL DE LECTURAS NORMALES ---
     @ServiceActivator(inputChannel = "lecturasNormalesCanal")
@@ -56,6 +60,8 @@ public class MqttSubscriberService {
             System.err.println("❌ Error procesando lecturas normales: " + e.getMessage());
         }
     }
+
+
 
     private void procesarLecturaIndividual(LecturaNormalDTO dto) {
         try {
@@ -83,6 +89,9 @@ public class MqttSubscriberService {
                 lectura.setCo2Ppm(dto.getLecturas().getCo2Ppm());
                 lectura.setPm25Ugm3(dto.getLecturas().getPm25Ugm3());
                 lectura.setPm10Ugm3(dto.getLecturas().getPm10Ugm3());
+
+                String nivelRiesgo = motorReglasService.calcularIndice(lectura.getPm25Ugm3(), lectura.getPm10Ugm3(), lectura.getCo2Ppm());
+                lectura.setNivelRiesgo(nivelRiesgo);
             }
 
             // 4. Guardar en PostgreSQL

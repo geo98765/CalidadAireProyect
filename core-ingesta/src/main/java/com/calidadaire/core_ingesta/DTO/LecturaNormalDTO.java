@@ -1,10 +1,18 @@
 package com.calidadaire.core_ingesta.DTO;
 
+
 import java.time.Instant;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class LecturaNormalDTO {
+    
+    @JsonProperty("nodo_id")
     private String nodoId;
-    private Instant timestampOrigen; // Manejo en UTC
+
+    @JsonProperty("timestamp_origen")
+    private Instant timestampOrigen;
+
     private Lecturas lecturas;
 
     public String getNodoId() {
@@ -31,14 +39,22 @@ public class LecturaNormalDTO {
         this.lecturas = lecturas;
     }
 
-    // Getters y Setters...
+
+    // ... (Tus Getters y Setters se quedan exactamente igual) ...
 
     public static class Lecturas {
+        
+        @JsonProperty("co2_ppm")
         private Double co2Ppm;
+
+        @JsonProperty("pm25_ugm3")
         private Double pm25Ugm3;
+
+        @JsonProperty("pm10_ugm3")
         private Double pm10Ugm3;
         
-        // Getters y Setters...
+        
+        // ... (Tus Getters y Setters se quedan exactamente igual) ...
 
         public Double getCo2Ppm() {
             return co2Ppm;
@@ -63,7 +79,5 @@ public class LecturaNormalDTO {
         public void setPm10Ugm3(Double pm10Ugm3) {
             this.pm10Ugm3 = pm10Ugm3;
         }
-
     }
-    
 }

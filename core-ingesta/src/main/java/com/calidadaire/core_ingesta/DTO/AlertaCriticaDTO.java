@@ -2,11 +2,18 @@ package com.calidadaire.core_ingesta.DTO;
 
 import java.time.Instant;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class AlertaCriticaDTO {
+    @JsonProperty("nodo_id")
     private String nodoId;
+    @JsonProperty("timestamp_origen")
     private Instant timestampOrigen;
+    @JsonProperty("tipo_alerta")
     private String tipoAlerta;
+    @JsonProperty("valor_registrado")
     private Double valorRegistrado;
+    @JsonProperty("mensaje")
     private String mensaje;
 
     public String getNodoId() {
