@@ -12,7 +12,6 @@ import com.calidadaire.core_ingesta.entity.LecturaNormal;
 @Repository
 public interface LecturaNormalRepository extends JpaRepository<LecturaNormal, Long> {
     boolean existsByNodoIdAndTimestampOrigen(UUID nodoId, Instant timestampOrigen);
-    // Busca la lectura más reciente de un nodo específico basándose en la fecha
     java.util.Optional<LecturaNormal> findTopByNodoIdOrderByTimestampOrigenDesc(java.util.UUID nodoId);
 }
 

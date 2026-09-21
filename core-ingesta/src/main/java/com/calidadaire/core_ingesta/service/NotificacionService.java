@@ -17,12 +17,12 @@ public class NotificacionService {
     private AlertaCriticaRepository alertaCriticaRepository;
 
     @Autowired
-    private JavaMailSender mailSender; // Inyectamos el cliente de correo
+    private JavaMailSender mailSender;
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
-    @Async // Hilo separado para no bloquear la ingesta
+    @Async
     public void dispararAlertaCritica(AlertaCritica alerta) {
         System.out.println("🚀 [NOTIFICADOR] Iniciando envío de E-MAIL para el nodo: " + alerta.getNodoId());
 
@@ -40,16 +40,16 @@ public class NotificacionService {
 
             mailSender.send(mensaje);
 
-            // Si no hay errores, marcamos como enviada
+            
             alerta.setEstadoNotificacion(true);
             alertaCriticaRepository.save(alerta);
             
-            System.out.println("✅ [NOTIFICADOR] E-mail enviado con éxito y alerta marcada en BD.");
+            System.out.println("E-mail enviado con éxito y alerta marcada en BD.");
 
             messagingTemplate.convertAndSend("/topic/alertas", alerta);
-            System.out.println("📡 [WEBSOCKET] Alerta transmitida en tiempo real al Dashboard.");
+            System.out.println("Alerta transmitida en tiempo real al Dashboard.");
         } catch (Exception e) {
-            System.err.println("❌ [NOTIFICADOR] Fallo al enviar el e-mail: " + e.getMessage());
+            System.err.println("Fallo al enviar el e-mail: " + e.getMessage());
         }
     }
 }

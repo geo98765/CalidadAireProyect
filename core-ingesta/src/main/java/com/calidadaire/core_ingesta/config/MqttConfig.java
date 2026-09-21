@@ -19,7 +19,6 @@ import org.springframework.messaging.MessageChannel;
 public class MqttConfig {
 
 
-    // 1. Externalizamos las variables (Preparando el terreno para el Paso 5)
     @Value("${mqtt.broker.url:tcp://localhost:1883}")
     private String brokerUrl;
 
@@ -37,38 +36,31 @@ public class MqttConfig {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         MqttConnectOptions options = new MqttConnectOptions();
         
-        // Usamos la variable que definiste arriba en lugar de ponerlo en duro
         options.setServerURIs(new String[]{brokerUrl}); 
         options.setCleanSession(true);
         
         factory.setConnectionOptions(options);
         return factory;
     }
-    // --- DEFINICIÓN DE CANALES ---
 
-    // Canal "puente" donde llegan todos los mensajes crudos del broker
     @Bean
     public MessageChannel mqttInboundRouterChannel() {
         return new DirectChannel();
     }
 
-    // Canal final para lecturas normales
     @Bean
     public MessageChannel lecturasNormalesCanal() {
         return new DirectChannel();
     }
 
-    // Canal final para alertas críticas
     @Bean
     public MessageChannel alertasCriticasCanal() {
         return new DirectChannel();
     }
 
-    // --- ADAPTADOR MQTT (ENTRADA) ---
 
     @Bean
     public MessageProducer inboundAdapter(MqttPahoClientFactory mqttClientFactory) {
-        // Nos suscribimos a ambos tópicos usando un array
         String[] topics = { topicNormales, topicAlertas };
         
         MqttPahoMessageDrivenChannelAdapter adapter =
@@ -82,29 +74,19 @@ public class MqttConfig {
         adapter.setConverter(new DefaultPahoMessageConverter());
         adapter.setQos(1);
         
-        // ¡Cambio clave! Ahora todo va al canal del router, no directo a lecturasNormales
         adapter.setOutputChannel(mqttInboundRouterChannel()); 
         
         return adapter;
     }
 
-    // --- EL ROUTER (CEREbro DEL ENRUTAMIENTO) ---
-
-    /**
-     * Intercepta los mensajes del canal mqttInboundRouterChannel, 
-     * revisa el tópico de origen y los dirige al canal correspondiente.
-     */
     @Router(inputChannel = "mqttInboundRouterChannel")
     public String routeMqttMessage(Message<?> message) {
-        // Extraemos el tópico por el que llegó el mensaje
         String receivedTopic = (String) message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC);
         
-        // Si el tópico coincide con el de alertas, lo mandamos a su canal
         if (receivedTopic != null && receivedTopic.equals(topicAlertas)) {
             return "alertasCriticasCanal";
         }
         
-        // Por defecto (o si es el tópico de normales), lo mandamos al canal de lecturas
         return "lecturasNormalesCanal";
     }
 }

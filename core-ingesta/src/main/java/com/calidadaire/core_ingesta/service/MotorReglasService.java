@@ -5,17 +5,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class MotorReglasService {
 
-    // Etiquetas constantes de la NOM-172
+    // NOM-172
     public static final String RIESGO_BUENO = "BUENO";
     public static final String RIESGO_ACEPTABLE = "ACEPTABLE";
     public static final String RIESGO_MALO = "MALO";
     public static final String RIESGO_MUY_MALO = "MUY MALO";
     public static final String RIESGO_EXTREMADAMENTE_MALO = "EXTREMADAMENTE MALO";
 
-    /**
-     * Calcula el nivel de riesgo global basándose en el principio del 
-     * "peor escenario" entre los contaminantes evaluados.
-     */
+ 
     public String calcularIndice(Double pm25, Double pm10, Double co2) {
         int nivelPm25 = evaluarPM25(pm25 != null ? pm25 : 0.0);
         int nivelPm10 = evaluarPM10(pm10 != null ? pm10 : 0.0);

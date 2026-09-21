@@ -39,9 +39,6 @@ public class LecturaNormalDTO {
         this.lecturas = lecturas;
     }
 
-
-    // ... (Tus Getters y Setters se quedan exactamente igual) ...
-
     public static class Lecturas {
         
         @JsonProperty("co2_ppm")
@@ -53,9 +50,6 @@ public class LecturaNormalDTO {
         @JsonProperty("pm10_ugm3")
         private Double pm10Ugm3;
         
-        
-        // ... (Tus Getters y Setters se quedan exactamente igual) ...
-
         public Double getCo2Ppm() {
             return co2Ppm;
         }

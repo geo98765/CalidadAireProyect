@@ -14,7 +14,7 @@ import lombok.Data;
 
 @Entity
 @Table(name = "lecturas_normales")
-@Data // Lombok genera los getters y setters automáticamente
+@Data
 public class LecturaNormal {
 
     @Id
