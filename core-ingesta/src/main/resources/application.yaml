@@ -7,9 +7,9 @@ spring:
 
   # Configuración de tu Base de Datos PostgreSQL
   datasource:
-    url: jdbc:postgresql://localhost:5433/calidad_aire_db
-    username: geovanni
-    password: 123
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/calidad_aire_db}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   # Configuración de Hibernate (JPA)
@@ -25,8 +25,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: huertageovanni961@gmail.com
-    password: febheepjwsoxxsoz # <-- ¡Escribe aquí tus 16 letras todo junto!
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD} # <-- ¡Escribe aquí tus 16 letras todo junto!
     properties:
       mail:
         smtp:

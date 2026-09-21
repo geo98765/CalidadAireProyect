@@ -80,7 +80,8 @@ public class MqttSubscriberService {
             lectura.setNodoId(nodoId);
             lectura.setTimestampOrigen(timestampOrigen);
             
-            String nivelRiesgo = "DESCONOCIDO";
+                        String nivelRiesgo = "DESCONOCIDO";
+            ResultadoClasificacion resultado = null;
 
             if (dto.getLecturas() != null) {
                 validarRangosFisicos(dto.getLecturas());
@@ -88,7 +89,8 @@ public class MqttSubscriberService {
                 lectura.setPm25Ugm3(dto.getLecturas().getPm25Ugm3());
                 lectura.setPm10Ugm3(dto.getLecturas().getPm10Ugm3());
 
-                nivelRiesgo = motorReglasService.calcularIndice(lectura.getPm25Ugm3(), lectura.getPm10Ugm3(), lectura.getCo2Ppm());
+                resultado = motorReglasService.calcularIndice(lectura.getPm25Ugm3(), lectura.getPm10Ugm3(), lectura.getCo2Ppm());
+                nivelRiesgo = resultado.nivel();
                 lectura.setNivelRiesgo(nivelRiesgo);
             }
 
@@ -98,15 +100,16 @@ public class MqttSubscriberService {
             messagingTemplate.convertAndSend("/topic/lecturas", lectura);
             System.out.println("📊 [WEBSOCKET] Lectura rutinaria transmitida al Dashboard.");
 
-            if ("MALO".equals(nivelRiesgo) || "MUY MALO".equals(nivelRiesgo)) {
+            if (resultado != null && ("MALO".equals(nivelRiesgo) || "MUY MALO".equals(nivelRiesgo))) {
                 System.out.println("⚠️ [MOTOR DE REGLAS] Calidad de aire peligrosa detectada. Generando alerta interna...");
-                
+
                 AlertaCritica alertaInterna = new AlertaCritica();
                 alertaInterna.setNodoId(nodoId);
                 alertaInterna.setTimestampOrigen(timestampOrigen);
                 alertaInterna.setTipoAlerta("RIESGO_" + nivelRiesgo.replace(" ", "_"));
-                alertaInterna.setValorRegistrado(lectura.getCo2Ppm()); // Tomamos el CO2 como referencia
-                alertaInterna.setMensaje("El Motor de Reglas clasificó la lectura normal rutinaria como: " + nivelRiesgo);
+                alertaInterna.setValorRegistrado(resultado.valorCausante());
+                alertaInterna.setMensaje("El Motor de Reglas clasificó la lectura normal rutinaria como: " + nivelRiesgo
+                        + " (variable causante: " + resultado.variableCausante() + ")");
                 alertaInterna.setEstadoNotificacion(false);
 
                 AlertaCritica alertaGuardada = alertaCriticaRepository.save(alertaInterna);

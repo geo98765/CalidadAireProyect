@@ -13,15 +13,33 @@ public class MotorReglasService {
     public static final String RIESGO_EXTREMADAMENTE_MALO = "EXTREMADAMENTE MALO";
 
  
-    public String calcularIndice(Double pm25, Double pm10, Double co2) {
+            public ResultadoClasificacion calcularIndice(Double pm25, Double pm10, Double co2) {
         int nivelPm25 = evaluarPM25(pm25 != null ? pm25 : 0.0);
         int nivelPm10 = evaluarPM10(pm10 != null ? pm10 : 0.0);
         int nivelCo2 = evaluarCO2(co2 != null ? co2 : 0.0);
 
-        // Obtenemos el nivel más alto de riesgo (0 = Bueno, 4 = Extremadamente Malo)
-        int peorEscenario = Math.max(nivelPm25, Math.max(nivelPm10, nivelCo2));
+        // Elegimos la variable causante del peor nivel. En empate,
+        // priorizamos por impacto en salud: PM2.5 > PM10 > CO2.
+        int peorEscenario;
+        String variableCausante;
+        Double valorCausante;
 
-        return traducirNivelAString(peorEscenario);
+        if (nivelPm25 >= nivelPm10 && nivelPm25 >= nivelCo2) {
+            peorEscenario = nivelPm25;
+            variableCausante = "PM2.5";
+            valorCausante = pm25;
+        } else if (nivelPm10 >= nivelCo2) {
+            peorEscenario = nivelPm10;
+            variableCausante = "PM10";
+            valorCausante = pm10;
+        } else {
+            peorEscenario = nivelCo2;
+            variableCausante = "CO2";
+            valorCausante = co2;
+        }
+
+        String nivel = traducirNivelAString(peorEscenario);
+        return new ResultadoClasificacion(nivel, variableCausante, valorCausante);
     }
 
     private int evaluarPM25(Double valor) {
