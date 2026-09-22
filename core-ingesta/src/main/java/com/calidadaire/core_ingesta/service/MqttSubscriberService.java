@@ -101,19 +101,23 @@ public class MqttSubscriberService {
             System.out.println("📊 [WEBSOCKET] Lectura rutinaria transmitida al Dashboard.");
 
             if (resultado != null && ("MALO".equals(nivelRiesgo) || "MUY MALO".equals(nivelRiesgo))) {
-                System.out.println("⚠️ [MOTOR DE REGLAS] Calidad de aire peligrosa detectada. Generando alerta interna...");
+                if (alertaCriticaRepository.existsByNodoIdAndTimestampOrigen(nodoId, timestampOrigen)) {
+                    System.out.println("⚠️ Ya existe una alerta crítica para este nodo/timestamp (probablemente reportada por el nodo Fog). Se omite duplicado.");
+                } else {
+                    System.out.println("⚠️ [MOTOR DE REGLAS] Calidad de aire peligrosa detectada. Generando alerta interna...");
 
-                AlertaCritica alertaInterna = new AlertaCritica();
-                alertaInterna.setNodoId(nodoId);
-                alertaInterna.setTimestampOrigen(timestampOrigen);
-                alertaInterna.setTipoAlerta("RIESGO_" + nivelRiesgo.replace(" ", "_"));
-                alertaInterna.setValorRegistrado(resultado.valorCausante());
-                alertaInterna.setMensaje("El Motor de Reglas clasificó la lectura normal rutinaria como: " + nivelRiesgo
-                        + " (variable causante: " + resultado.variableCausante() + ")");
-                alertaInterna.setEstadoNotificacion(false);
+                    AlertaCritica alertaInterna = new AlertaCritica();
+                    alertaInterna.setNodoId(nodoId);
+                    alertaInterna.setTimestampOrigen(timestampOrigen);
+                    alertaInterna.setTipoAlerta("RIESGO_" + nivelRiesgo.replace(" ", "_"));
+                    alertaInterna.setValorRegistrado(resultado.valorCausante());
+                    alertaInterna.setMensaje("El Motor de Reglas clasificó la lectura normal rutinaria como: " + nivelRiesgo
+                            + " (variable causante: " + resultado.variableCausante() + ")");
+                    alertaInterna.setEstadoNotificacion(false);
 
-                AlertaCritica alertaGuardada = alertaCriticaRepository.save(alertaInterna);
-                notificacionService.dispararAlertaCritica(alertaGuardada);
+                    AlertaCritica alertaGuardada = alertaCriticaRepository.save(alertaInterna);
+                    notificacionService.dispararAlertaCritica(alertaGuardada);
+                }
             }
 
         } catch (Exception e) {
@@ -137,9 +141,17 @@ public class MqttSubscriberService {
                 throw new IllegalArgumentException("Datos incompletos para alerta crítica.");
             }
 
+            UUID nodoId = UUID.fromString(dto.getNodoId());
+            Instant timestampOrigen = dto.getTimestampOrigen();
+
+            if (alertaCriticaRepository.existsByNodoIdAndTimestampOrigen(nodoId, timestampOrigen)) {
+                System.out.println("⚠️ Alerta crítica duplicada, ya registrada para nodo " + nodoId);
+                return;
+            }
+
             AlertaCritica alerta = new AlertaCritica();
-            alerta.setNodoId(UUID.fromString(dto.getNodoId()));
-            alerta.setTimestampOrigen(dto.getTimestampOrigen());
+            alerta.setNodoId(nodoId);
+            alerta.setTimestampOrigen(timestampOrigen);
             alerta.setTipoAlerta(dto.getTipoAlerta());
             alerta.setValorRegistrado(dto.getValorRegistrado());
             alerta.setMensaje(dto.getMensaje());

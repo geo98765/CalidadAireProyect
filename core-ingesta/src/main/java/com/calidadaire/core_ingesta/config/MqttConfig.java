@@ -22,13 +22,13 @@ public class MqttConfig {
     @Value("${mqtt.broker.url:tcp://localhost:1883}")
     private String brokerUrl;
 
-    @Value("${mqtt.client.id:core-ingesta-client}")
+    @Value("${mqtt.broker.client-id:core-ingesta-client}")
     private String clientId;
 
-    @Value("${mqtt.topic.normales:fog/lecturas/normales}")
+    @Value("${mqtt.topics.normales:fog/lecturas/normales}")
     private String topicNormales;
 
-    @Value("${mqtt.topic.alertas:fog/alertas/criticas}")
+    @Value("${mqtt.topics.criticas:fog/alertas/criticas}")
     private String topicAlertas;
 
     @Bean
@@ -37,7 +37,7 @@ public class MqttConfig {
         MqttConnectOptions options = new MqttConnectOptions();
         
         options.setServerURIs(new String[]{brokerUrl}); 
-        options.setCleanSession(true);
+        options.setCleanSession(false);
         
         factory.setConnectionOptions(options);
         return factory;

@@ -1,6 +1,5 @@
 version: '3.8'
 services:
-  # 1. TU MENSAJERO (El que ya tenías)
   mosquitto:
     image: eclipse-mosquitto:latest
     container_name: broker-mosquitto
@@ -10,15 +9,38 @@ services:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
     restart: always
 
-  # 2. TU NUEVO ARCHIVERO (La base de datos)
   base_de_datos:
     image: postgres:latest
     container_name: postgres-calidad-aire
     ports:
-      - "5433:5432" # El túnel mágico para que puedas usar pgAdmin
+      - "5433:5432"
     environment:
-      # Aquí defines tus credenciales (puedes cambiarlas a tu gusto)
-      - POSTGRES_USER=geovanni
-      - POSTGRES_PASSWORD=123
-      - POSTGRES_DB=calidad_aire_db
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: calidad_aire_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d calidad_aire_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  core-ingesta:
+    build:
+      context: ../core-ingesta
+    container_name: core-ingesta
+    ports:
+      - "8081:8081"
+    environment:
+      DB_URL: jdbc:postgresql://base_de_datos:5432/calidad_aire_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+    depends_on:
+      mosquitto:
+        condition: service_started
+      base_de_datos:
+        condition: service_healthy
     restart: always
