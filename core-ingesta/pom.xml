@@ -129,6 +129,15 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<environmentVariables>
+						<DB_URL>${env.DB_URL}</DB_URL>
+						<DB_USERNAME>${env.DB_USERNAME}</DB_USERNAME>
+						<DB_PASSWORD>${env.DB_PASSWORD}</DB_PASSWORD>
+						<MAIL_USERNAME>${env.MAIL_USERNAME}</MAIL_USERNAME>
+						<MAIL_PASSWORD>${env.MAIL_PASSWORD}</MAIL_PASSWORD>
+					</environmentVariables>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

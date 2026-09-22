@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "CoreIngestaApplication",
+      "request": "launch",
+      "mainClass": "com.calidadaire.core_ingesta.CoreIngestaApplication",
+      "projectName": "core-ingesta",
+      "env": {
+        "DB_URL": "jdbc:postgresql://localhost:5433/calidad_aire_db",
+        "DB_USERNAME": "geovanni",
+        "DB_PASSWORD": "123",
+        "MAIL_USERNAME": "huertageovanni961@gmail.com",
+        "MAIL_PASSWORD": "febheepjwsoxxsoz"
+      }
+    }
+  ]
+}
