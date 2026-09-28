@@ -21,6 +21,11 @@ spring:
       hibernate:
         format_sql: true
 
+  topics:
+    normales: fog/lecturas/normales
+    criticas: fog/alertas/criticas
+    notificaciones: interno/notificaciones/criticas
+
   # Configuración de E-mail (Gmail) - ¡AHORA SÍ ESTÁ DENTRO DE SPRING!
   mail:
     host: smtp.gmail.com

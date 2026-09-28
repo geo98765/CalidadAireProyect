@@ -19,7 +19,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Esta es la URL (el túnel) a la que se va a conectar el código de tu compañero (Residente 1)
+        // URL donde se va a conectar shagi
         registry.addEndpoint("/ws-calidad-aire")
                 .setAllowedOriginPatterns("*") 
                 .withSockJS();

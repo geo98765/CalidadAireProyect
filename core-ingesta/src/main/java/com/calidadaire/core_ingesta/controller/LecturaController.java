@@ -19,7 +19,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/v1/lecturas")
-@CrossOrigin(origins = "*") // ¡Clave para que el frontend del Residente 1 no sea bloqueado por seguridad!
+@CrossOrigin(origins = "*")
 @Tag(name = "Lecturas", description = "Endpoints para consultar el estado actual de la calidad del aire")
 public class LecturaController {
 
@@ -28,8 +28,8 @@ public class LecturaController {
 
     @GetMapping("/ultima/{nodoId}")
     @Operation(
-        summary = "Obtener la lectura más reciente", 
-        description = "Devuelve el registro más nuevo de un nodo de monitoreo específico. Ideal para actualizar medidores en tiempo real."
+        summary = "Obtener la lectura mas reciente", 
+        description = "Devuelve el registro mas nuevo de un nodo de monitoreo especifico"
     )
     public ResponseEntity<?> obtenerUltimaLectura(@PathVariable String nodoId) {
         try {
@@ -37,16 +37,13 @@ public class LecturaController {
             Optional<LecturaNormal> ultimaLectura = lecturaRepository.findTopByNodoIdOrderByTimestampOrigenDesc(id);
 
             if (ultimaLectura.isPresent()) {
-                // Devuelve un HTTP 200 (OK) con el JSON de la lectura
                 return ResponseEntity.ok(ultimaLectura.get());
             } else {
-                // Devuelve un HTTP 404 si el sensor existe pero no tiene lecturas
                 return ResponseEntity.notFound().build();
             }
             
         } catch (IllegalArgumentException e) {
-            // Devuelve un HTTP 400 si el texto enviado no es un UUID válido
-            return ResponseEntity.badRequest().body("El formato del ID de nodo es inválido.");
+            return ResponseEntity.badRequest().body("el formato es invalido");
         }
     }
 }

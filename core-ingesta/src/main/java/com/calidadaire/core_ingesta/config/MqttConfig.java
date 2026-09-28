@@ -5,15 +5,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.annotation.Router;
+import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.core.MessageProducer;
 import org.springframework.integration.mqtt.core.DefaultMqttPahoClientFactory;
 import org.springframework.integration.mqtt.core.MqttPahoClientFactory;
 import org.springframework.integration.mqtt.inbound.MqttPahoMessageDrivenChannelAdapter;
+import org.springframework.integration.mqtt.outbound.MqttPahoMessageHandler;
 import org.springframework.integration.mqtt.support.DefaultPahoMessageConverter;
 import org.springframework.integration.mqtt.support.MqttHeaders;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageHandler;
 
 @Configuration
 public class MqttConfig {
@@ -30,6 +33,9 @@ public class MqttConfig {
 
     @Value("${mqtt.topics.criticas:fog/alertas/criticas}")
     private String topicAlertas;
+
+    @Value("${mqtt.topics.notificaciones:interno/notificaciones/criticas}")
+    private String topicNotificaciones;
 
     @Bean
     public MqttPahoClientFactory mqttClientFactory() {
@@ -57,6 +63,24 @@ public class MqttConfig {
     public MessageChannel alertasCriticasCanal() {
         return new DirectChannel();
     }
+
+
+
+    @Bean
+    public MessageChannel notificacionesSalientesCanal() {
+        return new DirectChannel();
+    }
+
+    @Bean
+    @ServiceActivator(inputChannel = "notificacionesSalientesCanal")
+    public MessageHandler mqttOutbound(MqttPahoClientFactory mqttClientFactory) {
+        MqttPahoMessageHandler messageHandler =
+                new MqttPahoMessageHandler(clientId + "-notificador", mqttClientFactory);
+        messageHandler.setAsync(true);
+        messageHandler.setDefaultTopic(topicNotificaciones);
+        return messageHandler;
+    }
+
 
 
     @Bean

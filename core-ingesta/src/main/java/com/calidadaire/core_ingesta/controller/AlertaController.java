@@ -17,7 +17,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/v1/alertas")
-@CrossOrigin(origins = "*") // De nuevo, vital para el Dashboard
+@CrossOrigin(origins = "*")
 
 @Tag(name = "2. Bitácora de Alertas", description = "Endpoints para consultar el historial de emergencias y riesgos de salud")
 public class AlertaController {
@@ -28,13 +28,11 @@ public class AlertaController {
     @GetMapping("/recientes")
     @Operation(
         summary = "Obtener el historial reciente de alertas", 
-        description = "Devuelve una lista con las 20 alertas críticas más recientes registradas en toda la red, ordenadas de la más nueva a la más antigua."
+        description = "Devuelve una lista con las 20 alertas criticas mas recientes registradas en toda la red"
     )
     public ResponseEntity<List<AlertaCritica>> obtenerAlertasRecientes() {
-        // Obtenemos la lista directamente de PostgreSQL
         List<AlertaCritica> alertas = alertaRepository.findTop20ByOrderByTimestampOrigenDesc();
         
-        // Devolvemos un HTTP 200 (OK) con el arreglo JSON
         return ResponseEntity.ok(alertas);
     }
 }

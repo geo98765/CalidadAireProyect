@@ -18,8 +18,7 @@ public class MotorReglasService {
         int nivelPm10 = evaluarPM10(pm10 != null ? pm10 : 0.0);
         int nivelCo2 = evaluarCO2(co2 != null ? co2 : 0.0);
 
-        // Elegimos la variable causante del peor nivel. En empate,
-        // priorizamos por impacto en salud: PM2.5 > PM10 > CO2.
+
         int peorEscenario;
         String variableCausante;
         Double valorCausante;
@@ -43,11 +42,11 @@ public class MotorReglasService {
     }
 
     private int evaluarPM25(Double valor) {
-        if (valor <= 12.0) return 0; // BUENO
-        if (valor <= 45.0) return 1; // ACEPTABLE
-        if (valor <= 97.0) return 2; // MALO
-        if (valor <= 150.0) return 3; // MUY MALO
-        return 4; // EXTREMADAMENTE MALO
+        if (valor <= 12.0) return 0; // bueno
+        if (valor <= 45.0) return 1; // pasable
+        if (valor <= 97.0) return 2; // malo
+        if (valor <= 150.0) return 3; // muy malo
+        return 4; // muy muy malo
     }
 
     private int evaluarPM10(Double valor) {

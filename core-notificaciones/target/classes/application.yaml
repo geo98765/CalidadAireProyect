@@ -1,0 +1,36 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: core-notificaciones
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/calidad_aire_db}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+mqtt:
+  broker:
+    url: tcp://localhost:1883
+    client-id: core-notificaciones-client
+  topics:
+    notificaciones: interno/notificaciones/criticas
