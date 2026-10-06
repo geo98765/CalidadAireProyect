@@ -1,6 +1,7 @@
 package com.calidadaire.core_notificaciones.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -21,6 +22,11 @@ public class NotificacionService {
 
     @Autowired
     private JavaMailSender mailSender;
+
+    @Value("${spring.mail.username}")
+    private String remitente;
+
+    
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
@@ -51,8 +57,8 @@ public class NotificacionService {
 
         try {
             SimpleMailMessage mensaje = new SimpleMailMessage();
-            mensaje.setFrom("tu_correo_aqui@gmail.com");
-            mensaje.setTo("correo_destino@gmail.com");
+            mensaje.setFrom(remitente);
+            mensaje.setTo("geovanniminecraf@gmail.com");
             mensaje.setSubject("🚨 ALERTA CRÍTICA DE CALIDAD DEL AIRE: " + dto.tipoAlerta());
             mensaje.setText("Se ha detectado una anomalía crítica en el sistema.\n\n" +
                             "Nodo afectado: " + dto.nodoId() + "\n" +

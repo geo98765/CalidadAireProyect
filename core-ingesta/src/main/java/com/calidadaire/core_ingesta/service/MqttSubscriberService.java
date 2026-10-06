@@ -17,8 +17,10 @@ import com.calidadaire.core_ingesta.DTO.LecturaNormalDTO;
 import com.calidadaire.core_ingesta.DTO.NotificacionAlertaDTO;
 import com.calidadaire.core_ingesta.entity.AlertaCritica;
 import com.calidadaire.core_ingesta.entity.LecturaNormal;
+import com.calidadaire.core_ingesta.entity.NodoSensor;
 import com.calidadaire.core_ingesta.repository.AlertaCriticaRepository;
 import com.calidadaire.core_ingesta.repository.LecturaNormalRepository;
+import com.calidadaire.core_ingesta.repository.NodoSensorRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -41,6 +43,9 @@ public class MqttSubscriberService {
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
+
+    @Autowired
+    private NodoSensorRepository nodoSensorRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
@@ -66,6 +71,20 @@ public class MqttSubscriberService {
         }
     }
 
+
+    private void asegurarNodoRegistrado(UUID nodoId) {
+        if (!nodoSensorRepository.existsById(nodoId)) {
+            NodoSensor nuevoNodo = new NodoSensor();
+            nuevoNodo.setId(nodoId);
+            nuevoNodo.setUbicacion("Sin asignar");
+            nuevoNodo.setEstatus(true);
+            nodoSensorRepository.save(nuevoNodo);
+            System.out.println("🆕 Nodo auto-registrado: " + nodoId);
+        }
+    }
+
+
+
     private void procesarLecturaIndividual(LecturaNormalDTO dto) {
         try {
             if (dto.getNodoId() == null || dto.getTimestampOrigen() == null) {
@@ -74,6 +93,8 @@ public class MqttSubscriberService {
 
             UUID nodoId = UUID.fromString(dto.getNodoId());
             Instant timestampOrigen = dto.getTimestampOrigen();
+
+            asegurarNodoRegistrado(nodoId);
 
             if (lecturaRepository.existsByNodoIdAndTimestampOrigen(nodoId, timestampOrigen)) {
                 System.out.println("lectura duplicada " + nodoId);
@@ -170,6 +191,8 @@ public class MqttSubscriberService {
 
             UUID nodoId = UUID.fromString(dto.getNodoId());
             Instant timestampOrigen = dto.getTimestampOrigen();
+
+            asegurarNodoRegistrado(nodoId);
 
             if (alertaCriticaRepository.existsByNodoIdAndTimestampOrigen(nodoId, timestampOrigen)) {
                 System.out.println("alerta critica duplicada " + nodoId);

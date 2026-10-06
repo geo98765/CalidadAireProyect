@@ -44,3 +44,23 @@ services:
       base_de_datos:
         condition: service_healthy
     restart: always
+
+  core-notificaciones:
+    build:
+      context: ../core-notificaciones
+    container_name: core-notificaciones
+    ports:
+      - "8082:8082"
+    environment:
+      DB_URL: jdbc:postgresql://base_de_datos:5432/calidad_aire_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+    depends_on:
+      mosquitto:
+        condition: service_started
+      base_de_datos:
+        condition: service_healthy
+    restart: always

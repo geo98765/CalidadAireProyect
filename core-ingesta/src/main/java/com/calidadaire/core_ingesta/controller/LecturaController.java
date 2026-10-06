@@ -1,5 +1,8 @@
 package com.calidadaire.core_ingesta.controller;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -9,6 +12,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.calidadaire.core_ingesta.entity.LecturaNormal;
@@ -45,5 +49,24 @@ public class LecturaController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body("el formato es invalido");
         }
+    }
+
+
+    @GetMapping("/historico")
+    @Operation(
+        summary = "Obtener histórico de lecturas",
+        description = "Devuelve las lecturas de las últimas N horas (24 por defecto). Filtra por nodoId si se envía."
+    )
+    public ResponseEntity<List<LecturaNormal>> obtenerHistorico(
+            @RequestParam(required = false) String nodoId,
+            @RequestParam(defaultValue = "24") int horas) {
+
+        Instant desde = Instant.now().minus(horas, ChronoUnit.HOURS);
+
+        if (nodoId != null && !nodoId.isBlank()) {
+            UUID id = UUID.fromString(nodoId);
+            return ResponseEntity.ok(lecturaRepository.findByNodoIdAndTimestampOrigenAfterOrderByTimestampOrigenAsc(id, desde));
+        }
+        return ResponseEntity.ok(lecturaRepository.findByTimestampOrigenAfterOrderByTimestampOrigenAsc(desde));
     }
 }

@@ -13,5 +13,10 @@ import com.calidadaire.core_ingesta.entity.LecturaNormal;
 public interface LecturaNormalRepository extends JpaRepository<LecturaNormal, Long> {
     boolean existsByNodoIdAndTimestampOrigen(UUID nodoId, Instant timestampOrigen);
     java.util.Optional<LecturaNormal> findTopByNodoIdOrderByTimestampOrigenDesc(java.util.UUID nodoId);
+
+    java.util.List<LecturaNormal> findByTimestampOrigenAfterOrderByTimestampOrigenAsc(Instant desde);
+    java.util.List<LecturaNormal> findByNodoIdAndTimestampOrigenAfterOrderByTimestampOrigenAsc(UUID nodoId, Instant desde);
 }
+
+
 
