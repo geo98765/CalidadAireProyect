@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calidad del Aire — Panel en Tiempo Real</title>
-<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/dashboard.css?v=5">
 </head>
 <body>
 
@@ -18,44 +18,110 @@
 
 <div class="layout">
   <main>
-    <div class="stat-row" id="statRow">
-      <div class="stat-card">
-        <div class="label">CO2</div>
-        <div class="value">— <span class="unit">ppm</span></div>
+    <div id="livePanel">
+      <div class="stat-row" id="statRow">
+        <div class="stat-card">
+          <div class="label">CO2</div>
+          <div class="value">— <span class="unit">ppm</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">PM2.5</div>
+          <div class="value">— <span class="unit">µg/m³</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">PM10</div>
+          <div class="value">— <span class="unit">µg/m³</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Nivel de riesgo</div>
+          <div class="value"><span class="risk-badge" id="riskBadge">—</span></div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="label">PM2.5</div>
-        <div class="value">— <span class="unit">µg/m³</span></div>
+
+      <div class="card">
+        <h2>CO2 — <span id="filtroActualCo2" style="color:var(--text-secondary); font-weight:400;">general</span></h2>
+        <div class="chart-wrap">
+          <canvas id="trendChartCo2" role="img" aria-label="Tendencia de CO2 en las lecturas recientes"></canvas>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="label">PM10</div>
-        <div class="value">— <span class="unit">µg/m³</span></div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Nivel de riesgo</div>
-        <div class="value"><span class="risk-badge" id="riskBadge">—</span></div>
+
+      <div class="card">
+        <h2>Material particulado — <span id="filtroActualPm" style="color:var(--text-secondary); font-weight:400;">general</span></h2>
+        <div class="legend">
+          <span><i style="background:#eb6834"></i>PM2.5</span>
+          <span><i style="background:#1baf7a"></i>PM10</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="trendChartPm" role="img" aria-label="Tendencia de PM2.5 y PM10 en las lecturas recientes"></canvas>
+        </div>
       </div>
     </div>
 
-
-    <div class="card">
-      <h2>Histórico (últimas 24h) — <span id="filtroHistorico" style="color:var(--text-secondary); font-weight:400;">general</span></h2>
-      <div class="chart-wrap">
-        <canvas id="historicoChart" role="img" aria-label="Histórico de CO2, PM2.5 y PM10 de las últimas 24 horas"></canvas>
+    <div id="historicoPanel" style="display:none;">
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="label">CO2 (promedio)</div>
+          <div class="value" id="histCo2Avg">— <span class="unit">ppm</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">PM2.5 (promedio)</div>
+          <div class="value" id="histPm25Avg">— <span class="unit">µg/m³</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">PM10 (promedio)</div>
+          <div class="value" id="histPm10Avg">— <span class="unit">µg/m³</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Peor riesgo del periodo</div>
+          <div class="value"><span class="risk-badge" id="histRiskBadge">—</span></div>
+        </div>
       </div>
-    </div>
 
-
-
-    <div class="card">
-      <h2>Tendencia reciente — <span id="filtroActual" style="color:var(--text-secondary); font-weight:400;">general</span></h2>
-      <div class="legend">
-        <span><i style="background:#2a78d6"></i>CO2</span>
-        <span><i style="background:#eb6834"></i>PM2.5</span>
-        <span><i style="background:#1baf7a"></i>PM10</span>
+      <div class="card">
+        <h2>Histórico</h2>
+        <div class="filtros-historico">
+          <div class="filtro-campo">
+            <label for="filtroUbicacion">Ubicación</label>
+            <select id="filtroUbicacion">
+              <option value="general">Todos</option>
+            </select>
+          </div>
+          <div class="filtro-campo">
+            <label for="filtroPeriodo">Periodo</label>
+            <select id="filtroPeriodo">
+              <option value="24h" selected>Última 24h</option>
+              <option value="semana">Semana</option>
+              <option value="mes">Mes</option>
+              <option value="personalizado">Personalizado</option>
+            </select>
+          </div>
+          <div class="filtro-campo" id="campoDesde" style="display:none;">
+            <label for="fechaDesde">Desde</label>
+            <input type="date" id="fechaDesde">
+          </div>
+          <div class="filtro-campo" id="campoHasta" style="display:none;">
+            <label for="fechaHasta">Hasta</label>
+            <input type="date" id="fechaHasta">
+          </div>
+        </div>
       </div>
-      <div class="chart-wrap">
-        <canvas id="trendChart" role="img" aria-label="Tendencia de CO2, PM2.5 y PM10 en las lecturas recientes"></canvas>
+
+      <div class="card">
+        <h2>Histórico — CO2</h2>
+        <div class="chart-wrap">
+          <canvas id="historicoChartCo2" role="img" aria-label="Histórico de CO2 en el periodo seleccionado"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Histórico — Material particulado</h2>
+        <div class="legend">
+          <span><i style="background:#eb6834"></i>PM2.5</span>
+          <span><i style="background:#1baf7a"></i>PM10</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="historicoChartPm" role="img" aria-label="Histórico de PM2.5 y PM10 en el periodo seleccionado"></canvas>
+        </div>
       </div>
     </div>
   </main>
@@ -69,12 +135,70 @@
       <h2>Nodos</h2>
       <div id="nodesList"><div class="empty">Cargando nodos…</div></div>
     </div>
+    <div class="card">
+      <div id="infoBreve">
+      <h2>¿Qué significan estas señales?</h2>
+        <p class="info-text info-box info-box-co2"><strong>CO2</strong> — nivel de dióxido de carbono; valores altos indican poca ventilación del espacio.</p>
+        <p class="info-text info-box info-box-pm25"><strong>PM2.5</strong> — partículas finas suspendidas, penetran hasta el torrente sanguíneo.</p>
+        <p class="info-text info-box info-box-pm10"><strong>PM10</strong> — partículas más grandes, afectan sobre todo vías respiratorias altas.</p></div>
+      <button class="btn-saber-mas" id="btnSaberMas">Saber más</button>
+      
+      <div id="infoDetalle" style="display:none;">
+        <div class="variable-detalle variable-detalle-co2">
+          <h3>CO2 — Dióxido de carbono</h3>
+          <p><strong>Unidad:</strong> ppm (partes por millón)</p>
+          <p>Es el gas que exhalamos al respirar. En espacios cerrados, su acumulación es el mejor indicador de qué tan bien circula el aire fresco — no es tóxico por sí mismo a estos niveles, pero niveles altos sostenidos se asocian con somnolencia, dolor de cabeza y menor concentración.</p>
+          <table class="tabla-umbrales">
+            <thead><tr><th>Nivel</th><th>Rango (ppm)</th></tr></thead>
+            <tbody>
+              <tr><td class="nivel-bueno">Bueno</td><td>≤ 1000</td></tr>
+              <tr><td class="nivel-aceptable">Aceptable</td><td>1001 – 1500</td></tr>
+              <tr><td class="nivel-malo">Malo</td><td>1501 – 2000</td></tr>
+              <tr><td class="nivel-muymalo">Muy malo</td><td>2001 – 5000</td></tr>
+              <tr><td class="nivel-extremo">Extremadamente malo</td><td>&gt; 5000</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="variable-detalle variable-detalle-pm25">
+          <h3>PM2.5 — Partículas finas</h3>
+          <p><strong>Unidad:</strong> µg/m³ (microgramos por metro cúbico)</p>
+          <p>Partículas de 2.5 micrómetros o menos — unas 30 veces más delgadas que un cabello humano. Son lo bastante pequeñas para llegar hasta el fondo de los pulmones y pasar al torrente sanguíneo. Provienen sobre todo de combustión: vehículos, industria, quema de biomasa.</p>
+          <table class="tabla-umbrales">
+            <thead><tr><th>Nivel</th><th>Rango (µg/m³)</th></tr></thead>
+            <tbody>
+              <tr><td class="nivel-bueno">Bueno</td><td>≤ 12.0</td></tr>
+              <tr><td class="nivel-aceptable">Aceptable</td><td>12.1 – 45.0</td></tr>
+              <tr><td class="nivel-malo">Malo</td><td>45.1 – 97.0</td></tr>
+              <tr><td class="nivel-muymalo">Muy malo</td><td>97.1 – 150.0</td></tr>
+              <tr><td class="nivel-extremo">Extremadamente malo</td><td>&gt; 150.0</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="variable-detalle variable-detalle-pm10">
+          <h3>PM10 — Partículas gruesas</h3>
+          <p><strong>Unidad:</strong> µg/m³ (microgramos por metro cúbico)</p>
+          <p>Partículas de hasta 10 micrómetros — incluye al PM2.5 como subconjunto, más partículas más grandes como polvo, polen y moho. Al ser más grandes, se quedan sobre todo en nariz y garganta, en vez de llegar tan profundo como el PM2.5.</p>
+          <table class="tabla-umbrales">
+            <thead><tr><th>Nivel</th><th>Rango (µg/m³)</th></tr></thead>
+            <tbody>
+              <tr><td class="nivel-bueno">Bueno</td><td>≤ 50.0</td></tr>
+              <tr><td class="nivel-aceptable">Aceptable</td><td>50.1 – 75.0</td></tr>
+              <tr><td class="nivel-malo">Malo</td><td>75.1 – 155.0</td></tr>
+              <tr><td class="nivel-muymalo">Muy malo</td><td>155.1 – 235.0</td></tr>
+              <tr><td class="nivel-extremo">Extremadamente malo</td><td>&gt; 235.0</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </aside>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
-<script src="js/dashboard.js"></script>
+<script src="js/dashboard.js?v=5"></script>
 </body>
 </html>

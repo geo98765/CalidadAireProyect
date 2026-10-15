@@ -1,8 +1,11 @@
 package com.calidadaire.core_ingesta.controller;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -55,18 +58,37 @@ public class LecturaController {
     @GetMapping("/historico")
     @Operation(
         summary = "Obtener histórico de lecturas",
-        description = "Devuelve las lecturas de las últimas N horas (24 por defecto). Filtra por nodoId si se envía."
+        description = "Devuelve lecturas en un rango de fechas. Por defecto, últimas 24 horas. Acepta horas, o desde/hasta (yyyy-MM-dd) para un rango personalizado. Filtra por nodoId si se envía."
     )
     public ResponseEntity<List<LecturaNormal>> obtenerHistorico(
             @RequestParam(required = false) String nodoId,
-            @RequestParam(defaultValue = "24") int horas) {
+            @RequestParam(required = false) Integer horas,
+            @RequestParam(required = false) String desde,
+            @RequestParam(required = false) String hasta) {
 
-        Instant desde = Instant.now().minus(horas, ChronoUnit.HOURS);
+        Instant hastaInstant = (hasta != null && !hasta.isBlank())
+                ? LocalDate.parse(hasta).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant()
+                : Instant.now();
+
+        Instant desdeInstant = (desde != null && !desde.isBlank())
+                ? LocalDate.parse(desde).atStartOfDay(ZoneOffset.UTC).toInstant()
+                : hastaInstant.minus((horas != null ? horas : 24), ChronoUnit.HOURS);
 
         if (nodoId != null && !nodoId.isBlank()) {
             UUID id = UUID.fromString(nodoId);
-            return ResponseEntity.ok(lecturaRepository.findByNodoIdAndTimestampOrigenAfterOrderByTimestampOrigenAsc(id, desde));
+            return ResponseEntity.ok(lecturaRepository.findByNodoIdAndTimestampOrigenBetweenOrderByTimestampOrigenAsc(id, desdeInstant, hastaInstant));
         }
-        return ResponseEntity.ok(lecturaRepository.findByTimestampOrigenAfterOrderByTimestampOrigenAsc(desde));
+        return ResponseEntity.ok(lecturaRepository.findByTimestampOrigenBetweenOrderByTimestampOrigenAsc(desdeInstant, hastaInstant));
+    }
+
+    @GetMapping("/primera")
+    @Operation(
+        summary = "Obtener la fecha de la lectura más antigua registrada",
+        description = "Útil para limitar el selector de fechas del histórico personalizado."
+    )
+    public ResponseEntity<Map<String, Instant>> obtenerPrimeraLectura() {
+        return lecturaRepository.findTopByOrderByTimestampOrigenAsc()
+                .map(l -> ResponseEntity.ok(Map.of("timestampOrigen", l.getTimestampOrigen())))
+                .orElse(ResponseEntity.ok(Map.of()));
     }
 }

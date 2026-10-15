@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: core-ingesta
+  web:
+    resources:
+      cache:
+        period: 0
 
   # Configuración de tu Base de Datos PostgreSQL
   datasource:
