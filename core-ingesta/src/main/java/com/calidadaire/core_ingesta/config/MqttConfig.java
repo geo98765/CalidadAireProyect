@@ -37,6 +37,7 @@ public class MqttConfig {
     @Value("${mqtt.topics.notificaciones:interno/notificaciones/criticas}")
     private String topicNotificaciones;
 
+    //metodo para configurar la conexion al broker MQTT
     @Bean
     public MqttPahoClientFactory mqttClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
@@ -49,28 +50,31 @@ public class MqttConfig {
         return factory;
     }
 
+    //crea el canal que recibe los mensajes entrantes antes de ser clasificados
     @Bean
     public MessageChannel mqttInboundRouterChannel() {
         return new DirectChannel();
     }
 
+    //crea el canal interno de lecturas
     @Bean
     public MessageChannel lecturasNormalesCanal() {
         return new DirectChannel();
     }
-
+    //Crea el canal interno para alertas recibidas desde el Fog
     @Bean
     public MessageChannel alertasCriticasCanal() {
         return new DirectChannel();
     }
 
 
-
+    //Crea el canal interno para avisar al microservicio de notificaciones
     @Bean
     public MessageChannel notificacionesSalientesCanal() {
         return new DirectChannel();
     }
 
+    //Crea el componente que publica las notificaciones internas hacia Mosquitto
     @Bean
     @ServiceActivator(inputChannel = "notificacionesSalientesCanal")
     public MessageHandler mqttOutbound(MqttPahoClientFactory mqttClientFactory) {
@@ -82,7 +86,7 @@ public class MqttConfig {
     }
 
 
-
+    //Crea el componente que se suscribe a los tópicos de lecturas y alertas
     @Bean
     public MessageProducer inboundAdapter(MqttPahoClientFactory mqttClientFactory) {
         String[] topics = { topicNormales, topicAlertas };
@@ -103,6 +107,7 @@ public class MqttConfig {
         return adapter;
     }
 
+    //Revisa el topico del mensaje y decide a que canal enviarlo
     @Router(inputChannel = "mqttInboundRouterChannel")
     public String routeMqttMessage(Message<?> message) {
         String receivedTopic = (String) message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC);

@@ -1,0 +1,5 @@
+.vscode/launch.json
+.env
+*.env
+*.zip
+target/

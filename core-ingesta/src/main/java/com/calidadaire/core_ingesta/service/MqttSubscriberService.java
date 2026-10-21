@@ -56,7 +56,6 @@ public class MqttSubscriberService {
             JsonNode rootNode = objectMapper.readTree(payload);
 
             if (rootNode.isArray()) {
-                System.out.println("📦 [STORE-AND-FORWARD] Lote detectado. Procesando " + rootNode.size() + " lecturas atrasadas.");
                 for (JsonNode nodo : rootNode) {
                     LecturaNormalDTO dto = objectMapper.treeToValue(nodo, LecturaNormalDTO.class);
                     procesarLecturaIndividual(dto);
@@ -67,11 +66,11 @@ public class MqttSubscriberService {
             }
 
         } catch (Exception e) {
-            System.err.println("❌ Error procesando lecturas normales: " + e.getMessage());
+            System.err.println("Error en el metodo de procesarLecturasNormales" + e.getMessage());
         }
     }
 
-
+    
     private void asegurarNodoRegistrado(UUID nodoId) {
         if (!nodoSensorRepository.existsById(nodoId)) {
             NodoSensor nuevoNodo = new NodoSensor();
@@ -84,11 +83,10 @@ public class MqttSubscriberService {
     }
 
 
-
     private void procesarLecturaIndividual(LecturaNormalDTO dto) {
         try {
             if (dto.getNodoId() == null || dto.getTimestampOrigen() == null) {
-                throw new IllegalArgumentException("nodo_id y timestamp_origen son obligatorios.");
+                throw new IllegalArgumentException("el nodo_id y timestamp_origen son obligatorios");
             }
 
             UUID nodoId = UUID.fromString(dto.getNodoId());
@@ -105,7 +103,7 @@ public class MqttSubscriberService {
             lectura.setNodoId(nodoId);
             lectura.setTimestampOrigen(timestampOrigen);
             
-                        String nivelRiesgo = "DESCONOCIDO";
+            String nivelRiesgo = "DESCONOCIDO";
             ResultadoClasificacion resultado = null;
 
             if (dto.getLecturas() != null) {
@@ -127,7 +125,7 @@ public class MqttSubscriberService {
 
             if (resultado != null && ("MALO".equals(nivelRiesgo) || "MUY MALO".equals(nivelRiesgo))) {
                 if (alertaCriticaRepository.existsByNodoIdAndTimestampOrigen(nodoId, timestampOrigen)) {
-                    System.out.println("ya existe una alerta critica para este nodo");
+                    System.out.println("ya existe una alerta c");
                 } else {
                     System.out.println("calidad de aire peligrosa");
 

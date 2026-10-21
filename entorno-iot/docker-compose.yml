@@ -57,6 +57,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_DESTINATARIO: ${MAIL_DESTINATARIO}
       MQTT_BROKER_URL: tcp://mosquitto:1883
     depends_on:
       mosquitto:

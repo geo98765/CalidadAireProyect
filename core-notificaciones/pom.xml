@@ -63,6 +63,7 @@
 						<DB_PASSWORD>${env.DB_PASSWORD}</DB_PASSWORD>
 						<MAIL_USERNAME>${env.MAIL_USERNAME}</MAIL_USERNAME>
 						<MAIL_PASSWORD>${env.MAIL_PASSWORD}</MAIL_PASSWORD>
+						<MAIL_DESTINATARIO>${env.MAIL_DESTINATARIO}</MAIL_DESTINATARIO>
 					</environmentVariables>
 				</configuration>
 			</plugin>

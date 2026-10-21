@@ -26,6 +26,8 @@ public class NotificacionService {
     @Value("${spring.mail.username}")
     private String remitente;
 
+    @Value("${notificaciones.destinatario}")
+    private String destinatario;
     
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
@@ -36,7 +38,7 @@ public class NotificacionService {
             NotificacionAlertaDTO dto = objectMapper.readValue(mensaje.getPayload(), NotificacionAlertaDTO.class);
             dispararAlertaCritica(dto);
         } catch (Exception e) {
-            System.err.println("Error procesando notificación " + e.getMessage());
+            System.err.println("Error en la notificacion " + e.getMessage());
         }
     }
 
@@ -44,37 +46,35 @@ public class NotificacionService {
         AlertaCritica alerta = alertaCriticaRepository.findById(dto.id()).orElse(null);
 
         if (alerta == null) {
-            System.err.println("⚠️ No se encontró la alerta id=" + dto.id() + " en la base de datos.");
+            System.err.println("No se encontró la alerta id=" + dto.id() + " en la bd");
             return;
         }
 
         if (Boolean.TRUE.equals(alerta.getEstadoNotificacion())) {
-            System.out.println("⚠️ La alerta id=" + dto.id() + " ya fue notificada antes. Se omite envío duplicado (posible reentrega de MQTT).");
+            System.out.println("La alerta id=" + dto.id() + " ya fue notificada antes.");
             return;
         }
-
-        System.out.println("🚀 [NOTIFICADOR] Iniciando envío de E-MAIL para el nodo: " + dto.nodoId());
 
         try {
             SimpleMailMessage mensaje = new SimpleMailMessage();
             mensaje.setFrom(remitente);
-            mensaje.setTo("geovanniminecraf@gmail.com");
-            mensaje.setSubject("🚨 ALERTA CRÍTICA DE CALIDAD DEL AIRE: " + dto.tipoAlerta());
-            mensaje.setText("Se ha detectado una anomalía crítica en el sistema.\n\n" +
+               mensaje.setTo(destinatario.split("\\s*,\\s*"));
+            mensaje.setSubject("ALERTA CRITICA DE CALIDAD DEL AIRE: " + dto.tipoAlerta());
+            mensaje.setText("Se ha detectado un nivel critico en el sistema.\n\n" +
                             "Nodo afectado: " + dto.nodoId() + "\n" +
                             "Tipo de Alerta: " + dto.tipoAlerta() + "\n" +
                             "Valor Registrado: " + dto.valorRegistrado() + "\n" +
                             "Mensaje del Sensor: " + dto.mensaje() + "\n\n" +
-                            "Por favor, revise el dashboard inmediatamente.");
+                            "Revise el dashboard inmediatamente.");
 
             mailSender.send(mensaje);
 
             alerta.setEstadoNotificacion(true);
             alertaCriticaRepository.save(alerta);
 
-            System.out.println("E-mail enviado con éxito y alerta marcada en BD.");
+            System.out.println("gmail enviado y alerta marcada en BD");
         } catch (Exception e) {
-            System.err.println("Fallo al enviar el e-mail: " + e.getMessage());
+            System.err.println("Fallo al enviar gmail" + e.getMessage());
         }
     }
 }

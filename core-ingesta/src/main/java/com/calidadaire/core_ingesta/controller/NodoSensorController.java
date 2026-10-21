@@ -33,7 +33,7 @@ public class NodoSensorController {
 
     @GetMapping
     @Operation(summary = "Listar todos los nodos",
-            description = "Incluye tanto los registrados manualmente como los auto-registrados por primer contacto MQTT.")
+            description = "Incluye tanto los registrados manualmente como los autoregistrados por primer contacto MQTT.")
     public ResponseEntity<List<NodoSensor>> listarNodos() {
         return ResponseEntity.ok(nodoSensorRepository.findAll());
     }
@@ -47,13 +47,13 @@ public class NodoSensorController {
                     .<ResponseEntity<?>>map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("El formato del ID de nodo es inválido.");
+            return ResponseEntity.badRequest().body("El formato del ID de nodo es invalido.");
         }
     }
 
     @PostMapping
     @Operation(summary = "Registrar un nodo manualmente",
-            description = "Para pre-cargar un nodo antes de que la placa mande su primer mensaje. Falla con 409 si el ID ya existe.")
+            description = "Para precargar un nodo antes de que la placa mande su primer mensaje. Falla con 409 si el ID ya existe.")
     public ResponseEntity<?> crearNodo(@RequestBody NodoSensorDTO dto) {
         if (dto.getId() == null) {
             return ResponseEntity.badRequest().body("El campo 'id' es obligatorio.");
