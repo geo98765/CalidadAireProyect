@@ -82,6 +82,7 @@ public class MqttConfig {
                 new MqttPahoMessageHandler(clientId + "-notificador", mqttClientFactory);
         messageHandler.setAsync(true);
         messageHandler.setDefaultTopic(topicNotificaciones);
+        messageHandler.setDefaultQos(1);
         return messageHandler;
     }
 

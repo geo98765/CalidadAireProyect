@@ -42,7 +42,7 @@ public class NotificacionService {
         }
     }
 
-        private void dispararAlertaCritica(NotificacionAlertaDTO dto) {
+    private void dispararAlertaCritica(NotificacionAlertaDTO dto) {
         AlertaCritica alerta = alertaCriticaRepository.findById(dto.id()).orElse(null);
 
         if (alerta == null) {

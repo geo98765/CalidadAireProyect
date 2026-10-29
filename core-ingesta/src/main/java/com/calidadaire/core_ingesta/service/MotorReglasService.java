@@ -13,7 +13,7 @@ public class MotorReglasService {
     public static final String RIESGO_EXTREMADAMENTE_MALO = "EXTREMADAMENTE MALO";
 
  
-            public ResultadoClasificacion calcularIndice(Double pm25, Double pm10, Double co2) {
+    public ResultadoClasificacion calcularIndice(Double pm25, Double pm10, Double co2) {
         int nivelPm25 = evaluarPM25(pm25 != null ? pm25 : 0.0);
         int nivelPm10 = evaluarPM10(pm10 != null ? pm10 : 0.0);
         int nivelCo2 = evaluarCO2(co2 != null ? co2 : 0.0);

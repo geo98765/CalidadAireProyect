@@ -256,7 +256,7 @@ function cargarHistoricoConFiltros() {
       historicoChartCo2.update(); historicoChartPm.update();
       actualizarResumenHistorico(datos);
     })
-    .catch(err => console.error('No se pudo cargar el histórico:', err));
+    .catch(err => console.error('No se pudo cargar el historico:', err));
 }
 
 function configurarLimitesFecha() {

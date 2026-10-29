@@ -9,18 +9,17 @@ spring:
       cache:
         period: 0
 
-  # Configuración de tu Base de Datos PostgreSQL
+  # Base de datos posstgreSQL
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/calidad_aire_db}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
-  # Configuración de Hibernate (JPA)
   jpa:
     hibernate:
       ddl-auto: update # Crea o actualiza las tablas automáticamente al iniciar
-    show-sql: true # Útil en desarrollo para ver las consultas en la consola
+    show-sql: true
     properties:
       hibernate:
         format_sql: true
@@ -30,20 +29,7 @@ spring:
     criticas: fog/alertas/criticas
     notificaciones: interno/notificaciones/criticas
 
-  # Configuración de E-mail (Gmail) - ¡AHORA SÍ ESTÁ DENTRO DE SPRING!
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD} # <-- ¡Escribe aquí tus 16 letras todo junto!
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-
-# Configuración de nuestro Broker MQTT (Mosquitto)
+#Broker MQTT (Mosquitto)
 mqtt:
   broker:
     url: tcp://localhost:1883
@@ -52,9 +38,9 @@ mqtt:
     normales: fog/lecturas/normales
     criticas: fog/alertas/criticas
 
-    # Configuración de Swagger / OpenAPI
+#Swagger / OpenAPI
 springdoc:
   swagger-ui:
-    path: /docs # La URL donde vivirá tu documentación
+    path: /docs
   api-docs:
     path: /v3/api-docs

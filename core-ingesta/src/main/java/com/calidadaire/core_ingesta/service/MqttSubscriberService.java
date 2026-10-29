@@ -78,7 +78,7 @@ public class MqttSubscriberService {
             nuevoNodo.setUbicacion("Sin asignar");
             nuevoNodo.setEstatus(true);
             nodoSensorRepository.save(nuevoNodo);
-            System.out.println("🆕 Nodo auto-registrado: " + nodoId);
+            System.out.println("el nodo si se registro");
         }
     }
 
