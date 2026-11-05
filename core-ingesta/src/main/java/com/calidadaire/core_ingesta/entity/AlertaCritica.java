@@ -36,4 +36,7 @@ public class AlertaCritica {
 
     @Column(name = "estado_notificacion")
     private Boolean estadoNotificacion;
+
+    @Column(name = "mid", length = 100)
+    private String mid;
 }

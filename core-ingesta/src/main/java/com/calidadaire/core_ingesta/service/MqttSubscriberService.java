@@ -1,10 +1,14 @@
 package com.calidadaire.core_ingesta.service;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.Message;
@@ -12,9 +16,8 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import com.calidadaire.core_ingesta.DTO.AlertaCriticaDTO;
-import com.calidadaire.core_ingesta.DTO.LecturaNormalDTO;
 import com.calidadaire.core_ingesta.DTO.NotificacionAlertaDTO;
+import com.calidadaire.core_ingesta.config.PoliticaAlertas;
 import com.calidadaire.core_ingesta.entity.AlertaCritica;
 import com.calidadaire.core_ingesta.entity.LecturaNormal;
 import com.calidadaire.core_ingesta.entity.NodoSensor;
@@ -25,137 +28,239 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class MqttSubscriberService {
 
-    @Autowired
-    private LecturaNormalRepository lecturaRepository;
+    private static final int MAX_ORIGINAL_EN_LOG = 500;
 
-    @Autowired
-    private MotorReglasService motorReglasService;
+    private final LecturaNormalRepository lecturaRepository;
+    private final AlertaCriticaRepository alertaCriticaRepository;
+    private final NodoSensorRepository nodoSensorRepository;
+    private final MotorReglasService motorReglasService;
+    private final MensajeNormalizador normalizador;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final PoliticaAlertas politica;
+    private final Clock reloj;
+    private final MessageChannel notificacionesSalientesCanal;
 
-    @Autowired
-    private AlertaCriticaRepository alertaCriticaRepository;
-
-    @Autowired
-    @Qualifier("notificacionesSalientesCanal")
-    private MessageChannel notificacionesSalientesCanal;
-
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
-
-    @Autowired
-    private NodoSensorRepository nodoSensorRepository;
-
+    // Solo se usa para armar el aviso interno (lleva un Instant)
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
+    public MqttSubscriberService(
+            LecturaNormalRepository lecturaRepository,
+            AlertaCriticaRepository alertaCriticaRepository,
+            NodoSensorRepository nodoSensorRepository,
+            MotorReglasService motorReglasService,
+            MensajeNormalizador normalizador,
+            SimpMessagingTemplate messagingTemplate,
+            PoliticaAlertas politica,
+            Clock reloj,
+            @Qualifier("notificacionesSalientesCanal") MessageChannel notificacionesSalientesCanal) {
+        this.lecturaRepository = lecturaRepository;
+        this.alertaCriticaRepository = alertaCriticaRepository;
+        this.nodoSensorRepository = nodoSensorRepository;
+        this.motorReglasService = motorReglasService;
+        this.normalizador = normalizador;
+        this.messagingTemplate = messagingTemplate;
+        this.politica = politica;
+        this.reloj = reloj;
+        this.notificacionesSalientesCanal = notificacionesSalientesCanal;
+    }
+
+    // ---------- Puntos de entrada ----------
+
     @ServiceActivator(inputChannel = "lecturasNormalesCanal")
-    public void procesarLecturasNormales(Message<String> mensaje) {
-        String payload = mensaje.getPayload();
+    public void procesarLecturas(Message<String> mensaje) {
+        procesarPayload(mensaje.getPayload(), "lectura", this::procesarLectura);
+    }
+
+    @ServiceActivator(inputChannel = "alertasCriticasCanal")
+    public void procesarAlertas(Message<String> mensaje) {
+        procesarPayload(mensaje.getPayload(), "alerta", this::procesarAlerta);
+    }
+
+    // Acepta un objeto o un arreglo de objetos, y aísla los errores mensaje por mensaje
+    private void procesarPayload(String payload, String tipo, Consumer<JsonNode> procesador) {
+        JsonNode raiz;
         try {
-            JsonNode rootNode = objectMapper.readTree(payload);
-
-            if (rootNode.isArray()) {
-                for (JsonNode nodo : rootNode) {
-                    LecturaNormalDTO dto = objectMapper.treeToValue(nodo, LecturaNormalDTO.class);
-                    procesarLecturaIndividual(dto);
-                }
-            } else {
-                LecturaNormalDTO dto = objectMapper.treeToValue(rootNode, LecturaNormalDTO.class);
-                procesarLecturaIndividual(dto);
-            }
-
+            raiz = objectMapper.readTree(payload);
         } catch (Exception e) {
-            System.err.println("Error en el metodo de procesarLecturasNormales" + e.getMessage());
+            log.warn("Mensaje de {} descartado: no es JSON válido ({}). Original: {}",
+                    tipo, e.getMessage(), resumir(payload));
+            return;
         }
-    }
-
-    
-    private void asegurarNodoRegistrado(UUID nodoId) {
-        if (!nodoSensorRepository.existsById(nodoId)) {
-            NodoSensor nuevoNodo = new NodoSensor();
-            nuevoNodo.setId(nodoId);
-            nuevoNodo.setUbicacion("Sin asignar");
-            nuevoNodo.setEstatus(true);
-            nodoSensorRepository.save(nuevoNodo);
-            System.out.println("el nodo si se registro");
+        if (raiz == null || raiz.isMissingNode()) {
+            log.warn("Mensaje de {} descartado: llegó vacío", tipo);
+            return;
         }
-    }
-
-
-    private void procesarLecturaIndividual(LecturaNormalDTO dto) {
-        try {
-            if (dto.getNodoId() == null || dto.getTimestampOrigen() == null) {
-                throw new IllegalArgumentException("el nodo_id y timestamp_origen son obligatorios");
+        if (raiz.isArray()) {
+            for (JsonNode elemento : raiz) {
+                procesarElemento(elemento, tipo, procesador);
             }
+        } else {
+            procesarElemento(raiz, tipo, procesador);
+        }
+    }
 
-            UUID nodoId = UUID.fromString(dto.getNodoId());
-            Instant timestampOrigen = dto.getTimestampOrigen();
+    private void procesarElemento(JsonNode elemento, String tipo, Consumer<JsonNode> procesador) {
+        try {
+            procesador.accept(elemento);
+        } catch (MensajeInvalidoException e) {
+            log.warn("Mensaje de {} rechazado: {}. Original: {}", tipo, e.getMessage(), resumir(elemento.toString()));
+        } catch (Exception e) {
+            log.error("Error procesando un mensaje de {}. Original: {}", tipo, resumir(elemento.toString()), e);
+        }
+    }
 
-            asegurarNodoRegistrado(nodoId);
+    // ---------- Lecturas ----------
 
-            if (lecturaRepository.existsByNodoIdAndTimestampOrigen(nodoId, timestampOrigen)) {
-                System.out.println("lectura duplicada " + nodoId);
+    private void procesarLectura(JsonNode mensaje) {
+        LecturaNormalizada l = normalizador.normalizarLectura(mensaje);
+
+        boolean duplicada = l.mid() != null
+                ? lecturaRepository.existsByMid(l.mid())
+                : lecturaRepository.existsByNodoIdAndTimestampOrigen(l.nodoId(), l.timestampOrigen());
+        if (duplicada) {
+            log.info("Lectura duplicada ignorada (nodo {}, mid {}, momento {})", l.nodoId(), l.mid(), l.timestampOrigen());
+            return;
+        }
+
+        asegurarNodoRegistrado(l.nodoId(), l.nombreOrigen());
+
+        ResultadoClasificacion resultado = motorReglasService.calcularIndice(l.pm25Ugm3(), l.pm10Ugm3(), l.co2Ppm());
+
+        LecturaNormal lectura = new LecturaNormal();
+        lectura.setMid(l.mid());
+        lectura.setNodoId(l.nodoId());
+        lectura.setTimestampOrigen(l.timestampOrigen());
+        lectura.setCo2Ppm(l.co2Ppm());
+        lectura.setPm25Ugm3(l.pm25Ugm3());
+        lectura.setPm10Ugm3(l.pm10Ugm3());
+        lectura.setTemperaturaC(l.temperaturaC());
+        lectura.setHumedadPct(l.humedadPct());
+        lectura.setNivelRiesgo(resultado.nivel());   // nulo si el mensaje no traía contaminantes
+
+        try {
+            lectura = lecturaRepository.save(lectura);
+        } catch (DataIntegrityViolationException e) {
+            log.info("Lectura duplicada ignorada por restricción de la base (nodo {}, mid {})", l.nodoId(), l.mid());
+            return;
+        }
+        log.info("Lectura guardada: nodo {} | riesgo {} | momento {}",
+                l.nodoId(), resultado.sinDatos() ? "sin datos" : resultado.nivel(), l.timestampOrigen());
+
+        messagingTemplate.convertAndSend("/topic/lecturas", lectura);
+
+        if (resultado.esAlertable()) {
+            crearAlertaDeRiesgo(l, resultado);
+        }
+    }
+
+    private void crearAlertaDeRiesgo(LecturaNormalizada l, ResultadoClasificacion resultado) {
+        String tipo = resultado.tipoAlerta();
+
+        if (alertaCriticaRepository.existsByNodoIdAndTimestampOrigenAndTipoAlerta(l.nodoId(), l.timestampOrigen(), tipo)) {
+            log.info("Ya existe la alerta {} para el nodo {} en ese momento", tipo, l.nodoId());
+            return;
+        }
+
+        // Enfriamiento: no repetir mientras haya una alerta igual o más grave dentro de la ventana
+        if (politica.getEnfriamientoMinutos() > 0) {
+            Instant desde = l.timestampOrigen().minus(Duration.ofMinutes(politica.getEnfriamientoMinutos()));
+            if (alertaCriticaRepository.existsByNodoIdAndTipoAlertaInAndTimestampOrigenAfter(
+                    l.nodoId(), resultado.tiposDeAlertaIgualesOPeores(), desde)) {
+                log.info("Alerta {} omitida por enfriamiento (nodo {}): ya hubo una igual o más grave en los últimos {} min",
+                        tipo, l.nodoId(), politica.getEnfriamientoMinutos());
                 return;
             }
+        }
 
-            LecturaNormal lectura = new LecturaNormal();
-            lectura.setNodoId(nodoId);
-            lectura.setTimestampOrigen(timestampOrigen);
-            
-            String nivelRiesgo = "DESCONOCIDO";
-            ResultadoClasificacion resultado = null;
+        AlertaCritica alerta = new AlertaCritica();
+        alerta.setNodoId(l.nodoId());
+        alerta.setTimestampOrigen(l.timestampOrigen());
+        alerta.setTipoAlerta(tipo);
+        alerta.setValorRegistrado(resultado.valorCausante());
+        alerta.setMensaje("El motor de reglas clasificó la lectura como " + resultado.nivel()
+                + " (variable causante: " + resultado.variableCausante() + ")");
+        alerta.setEstadoNotificacion(false);
 
-            if (dto.getLecturas() != null) {
-                validarRangosFisicos(dto.getLecturas());
-                lectura.setCo2Ppm(dto.getLecturas().getCo2Ppm());
-                lectura.setPm25Ugm3(dto.getLecturas().getPm25Ugm3());
-                lectura.setPm10Ugm3(dto.getLecturas().getPm10Ugm3());
+        AlertaCritica guardada = alertaCriticaRepository.save(alerta);
+        log.warn("Alerta {} generada por el motor de reglas (nodo {}, alerta id {})", tipo, l.nodoId(), guardada.getId());
+        avisar(guardada, politica.isCorreoDesdeMotor());
+    }
 
-                resultado = motorReglasService.calcularIndice(lectura.getPm25Ugm3(), lectura.getPm10Ugm3(), lectura.getCo2Ppm());
-                nivelRiesgo = resultado.nivel();
-                lectura.setNivelRiesgo(nivelRiesgo);
-            }
+    // ---------- Alertas que llegan del nodo ----------
 
-            lecturaRepository.save(lectura);
-            System.out.println("lectura guardada Riesgo " + nivelRiesgo + " | TS: " + timestampOrigen);
+    private void procesarAlerta(JsonNode mensaje) {
+        Optional<AlertaNormalizada> normalizada = normalizador.normalizarAlerta(mensaje);
+        if (normalizada.isEmpty()) {
+            log.debug("Alarma resuelta ignorada: {}", resumir(mensaje.toString()));
+            return;
+        }
+        AlertaNormalizada a = normalizada.get();
 
-            messagingTemplate.convertAndSend("/topic/lecturas", lectura);
-            System.out.println("transmitida al Dashboard");
+        boolean duplicada = a.mid() != null
+                ? alertaCriticaRepository.existsByMid(a.mid())
+                : alertaCriticaRepository.existsByNodoIdAndTimestampOrigenAndTipoAlerta(
+                        a.nodoId(), a.timestampOrigen(), a.tipoAlerta());
+        if (duplicada) {
+            log.info("Alerta duplicada ignorada (nodo {}, mid {}, tipo {})", a.nodoId(), a.mid(), a.tipoAlerta());
+            return;
+        }
 
-            if (resultado != null && ("MALO".equals(nivelRiesgo) || "MUY MALO".equals(nivelRiesgo))) {
-                if (alertaCriticaRepository.existsByNodoIdAndTimestampOrigen(nodoId, timestampOrigen)) {
-                    System.out.println("ya existe una alerta c");
-                } else {
-                    System.out.println("calidad de aire peligrosa");
+        asegurarNodoRegistrado(a.nodoId(), a.nombreOrigen());
 
-                    AlertaCritica alertaInterna = new AlertaCritica();
-                    alertaInterna.setNodoId(nodoId);
-                    alertaInterna.setTimestampOrigen(timestampOrigen);
-                    alertaInterna.setTipoAlerta("RIESGO_" + nivelRiesgo.replace(" ", "_"));
-                    alertaInterna.setValorRegistrado(resultado.valorCausante());
-                    alertaInterna.setMensaje("se clasifico la lectura normal como: " + nivelRiesgo
-                            + " (variable causante: " + resultado.variableCausante() + ")");
-                    alertaInterna.setEstadoNotificacion(false);
+        AlertaCritica alerta = new AlertaCritica();
+        alerta.setMid(a.mid());
+        alerta.setNodoId(a.nodoId());
+        alerta.setTimestampOrigen(a.timestampOrigen());
+        alerta.setTipoAlerta(a.tipoAlerta());
+        alerta.setValorRegistrado(a.valorRegistrado());
+        alerta.setMensaje(a.mensaje());
+        alerta.setEstadoNotificacion(false);
 
-                    AlertaCritica alertaGuardada = alertaCriticaRepository.save(alertaInterna);
-                    notificarYTransmitirAlerta(alertaGuardada);
-                }
-            }
+        AlertaCritica guardada;
+        try {
+            guardada = alertaCriticaRepository.save(alerta);
+        } catch (DataIntegrityViolationException e) {
+            log.info("Alerta duplicada ignorada por restricción de la base (nodo {}, mid {})", a.nodoId(), a.mid());
+            return;
+        }
+        log.warn("Alerta del nodo guardada: {} (nodo {}, alerta id {})", a.tipoAlerta(), a.nodoId(), guardada.getId());
+        avisar(guardada, politica.isCorreoDesdeNodo());
+    }
 
-        } catch (Exception e) {
-            System.err.println("Error" + e.getMessage());
+    // ---------- Utilidades ----------
+
+    private void asegurarNodoRegistrado(UUID nodoId, String nombreOrigen) {
+        if (!nodoSensorRepository.existsById(nodoId)) {
+            NodoSensor nuevo = new NodoSensor();
+            nuevo.setId(nodoId);
+            // Si el nodo se identificó con un nombre (p. ej. S_AIRE_06), sirve de ubicación inicial
+            nuevo.setUbicacion(nombreOrigen != null ? nombreOrigen : "Sin asignar");
+            nuevo.setEstatus(true);
+            nodoSensorRepository.save(nuevo);
+            log.info("Nodo auto-registrado: {} ({})", nodoId, nuevo.getUbicacion());
         }
     }
 
-    private void validarRangosFisicos(LecturaNormalDTO.Lecturas lecturas) {
-        if (lecturas.getCo2Ppm() != null && lecturas.getCo2Ppm() < 0) throw new IllegalArgumentException("CO2 ppm no puede ser negativo.");
-        if (lecturas.getPm25Ugm3() != null && lecturas.getPm25Ugm3() < 0) throw new IllegalArgumentException("PM2.5 no puede ser negativo.");
-        if (lecturas.getPm10Ugm3() != null && lecturas.getPm10Ugm3() < 0) throw new IllegalArgumentException("PM10 no puede ser negativo.");
-    }
+    // Transmite al dashboard y, si la política lo permite, publica el aviso para core-notificaciones
+    private void avisar(AlertaCritica alerta, boolean enviarCorreo) {
+        if (!esReciente(alerta.getTimestampOrigen())) {
+            log.info("La alerta id={} es de hace más de {} min: se guarda sin avisar",
+                    alerta.getId(), politica.getAntiguedadMaximaMinutos());
+            return;
+        }
 
-    private void notificarYTransmitirAlerta(AlertaCritica alerta) {
         messagingTemplate.convertAndSend("/topic/alertas", alerta);
+
+        if (!enviarCorreo) {
+            log.info("Alerta id={} transmitida al dashboard; el correo está desactivado para este origen", alerta.getId());
+            return;
+        }
 
         try {
             NotificacionAlertaDTO dto = new NotificacionAlertaDTO(
@@ -164,54 +269,27 @@ public class MqttSubscriberService {
                     alerta.getTipoAlerta(),
                     alerta.getValorRegistrado(),
                     alerta.getMensaje(),
-                    alerta.getTimestampOrigen()
-            );
+                    alerta.getTimestampOrigen());
             String payload = objectMapper.writeValueAsString(dto);
             notificacionesSalientesCanal.send(MessageBuilder.withPayload(payload).build());
-            System.out.println("notificacion publicada para alerta id=" + alerta.getId());
+            log.info("Notificación publicada para la alerta id={}", alerta.getId());
         } catch (Exception e) {
-            System.err.println("Error" + e.getMessage());
+            log.error("No se pudo publicar la notificación de la alerta id={}", alerta.getId(), e);
         }
     }
 
-
-
-
-    @ServiceActivator(inputChannel = "alertasCriticasCanal")
-    public void procesarAlertaCritica(Message<String> mensaje) {
-        String payload = mensaje.getPayload();
-        try {
-            AlertaCriticaDTO dto = objectMapper.readValue(payload, AlertaCriticaDTO.class);
-
-            if (dto.getNodoId() == null || dto.getTimestampOrigen() == null || dto.getTipoAlerta() == null) {
-                throw new IllegalArgumentException("Datos incompletos en alerta critica ");
-            }
-
-            UUID nodoId = UUID.fromString(dto.getNodoId());
-            Instant timestampOrigen = dto.getTimestampOrigen();
-
-            asegurarNodoRegistrado(nodoId);
-
-            if (alertaCriticaRepository.existsByNodoIdAndTimestampOrigen(nodoId, timestampOrigen)) {
-                System.out.println("alerta critica duplicada " + nodoId);
-                return;
-            }
-
-            AlertaCritica alerta = new AlertaCritica();
-            alerta.setNodoId(nodoId);
-            alerta.setTimestampOrigen(timestampOrigen);
-            alerta.setTipoAlerta(dto.getTipoAlerta());
-            alerta.setValorRegistrado(dto.getValorRegistrado());
-            alerta.setMensaje(dto.getMensaje());
-            alerta.setEstadoNotificacion(false); 
-
-            AlertaCritica alertaGuardada = alertaCriticaRepository.save(alerta);
-            System.out.println("Alerta guardada en BD: " + alertaGuardada.getTipoAlerta());
-
-            notificarYTransmitirAlerta(alertaGuardada);
-
-        } catch (Exception e) {
-            System.err.println("Error" + e.getMessage());
+    private boolean esReciente(Instant momento) {
+        int limite = politica.getAntiguedadMaximaMinutos();
+        if (limite <= 0) {
+            return true;
         }
+        return !momento.isBefore(reloj.instant().minus(Duration.ofMinutes(limite)));
+    }
+
+    private static String resumir(String texto) {
+        if (texto == null) {
+            return "";
+        }
+        return texto.length() <= MAX_ORIGINAL_EN_LOG ? texto : texto.substring(0, MAX_ORIGINAL_EN_LOG) + "…";
     }
 }

@@ -5,51 +5,57 @@ import org.springframework.stereotype.Service;
 @Service
 public class MotorReglasService {
 
-    // NOM-172
+    // Niveles de riesgo según NOM-172
     public static final String RIESGO_BUENO = "BUENO";
     public static final String RIESGO_ACEPTABLE = "ACEPTABLE";
     public static final String RIESGO_MALO = "MALO";
     public static final String RIESGO_MUY_MALO = "MUY MALO";
     public static final String RIESGO_EXTREMADAMENTE_MALO = "EXTREMADAMENTE MALO";
 
- 
+    /**
+     * Clasifica una lectura con las variables que traiga: las ausentes (null) no cuentan.
+     * Si no llega ninguna, devuelve SIN_DATOS en lugar de suponer "BUENO".
+     * Cuando dos variables empatan en nivel, la causante se elige en este orden: PM2.5, PM10, CO2.
+     */
     public ResultadoClasificacion calcularIndice(Double pm25, Double pm10, Double co2) {
-        int nivelPm25 = evaluarPM25(pm25 != null ? pm25 : 0.0);
-        int nivelPm10 = evaluarPM10(pm10 != null ? pm10 : 0.0);
-        int nivelCo2 = evaluarCO2(co2 != null ? co2 : 0.0);
+        int peorNivel = -1;
+        String variable = null;
+        Double valor = null;
 
-
-        int peorEscenario;
-        String variableCausante;
-        Double valorCausante;
-
-        if (nivelPm25 >= nivelPm10 && nivelPm25 >= nivelCo2) {
-            peorEscenario = nivelPm25;
-            variableCausante = "PM2.5";
-            valorCausante = pm25;
-        } else if (nivelPm10 >= nivelCo2) {
-            peorEscenario = nivelPm10;
-            variableCausante = "PM10";
-            valorCausante = pm10;
-        } else {
-            peorEscenario = nivelCo2;
-            variableCausante = "CO2";
-            valorCausante = co2;
+        // Solo se reemplaza si el nivel es estrictamente peor: el orden de estos bloques decide los empates
+        if (esUsable(pm25)) {
+            int nivel = evaluarPM25(pm25);
+            if (nivel > peorNivel) { peorNivel = nivel; variable = "PM2.5"; valor = pm25; }
+        }
+        if (esUsable(pm10)) {
+            int nivel = evaluarPM10(pm10);
+            if (nivel > peorNivel) { peorNivel = nivel; variable = "PM10"; valor = pm10; }
+        }
+        if (esUsable(co2)) {
+            int nivel = evaluarCO2(co2);
+            if (nivel > peorNivel) { peorNivel = nivel; variable = "CO2"; valor = co2; }
         }
 
-        String nivel = traducirNivelAString(peorEscenario);
-        return new ResultadoClasificacion(nivel, variableCausante, valorCausante);
+        if (variable == null) {
+            return ResultadoClasificacion.SIN_DATOS;
+        }
+        return new ResultadoClasificacion(traducirNivelAString(peorNivel), variable, valor);
     }
 
-    private int evaluarPM25(Double valor) {
-        if (valor <= 12.0) return 0; // bueno
-        if (valor <= 45.0) return 1; // pasable
-        if (valor <= 97.0) return 2; // malo
-        if (valor <= 150.0) return 3; // muy malo
-        return 4; // muy muy malo
+    // Un valor ausente o no numérico no participa en la clasificación
+    private boolean esUsable(Double valor) {
+        return valor != null && !valor.isNaN() && !valor.isInfinite();
     }
 
-    private int evaluarPM10(Double valor) {
+    private int evaluarPM25(double valor) {
+        if (valor <= 12.0) return 0;   // bueno
+        if (valor <= 45.0) return 1;   // aceptable
+        if (valor <= 97.0) return 2;   // malo
+        if (valor <= 150.0) return 3;  // muy malo
+        return 4;                      // extremadamente malo
+    }
+
+    private int evaluarPM10(double valor) {
         if (valor <= 50.0) return 0;
         if (valor <= 75.0) return 1;
         if (valor <= 155.0) return 2;
@@ -57,7 +63,7 @@ public class MotorReglasService {
         return 4;
     }
 
-    private int evaluarCO2(Double valor) {
+    private int evaluarCO2(double valor) {
         if (valor <= 1000.0) return 0;
         if (valor <= 1500.0) return 1;
         if (valor <= 2000.0) return 2;

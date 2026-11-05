@@ -19,10 +19,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update # Crea o actualiza las tablas automáticamente al iniciar
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 
   topics:
     normales: fog/lecturas/normales
@@ -35,8 +35,11 @@ mqtt:
     url: tcp://localhost:1883
     client-id: backend-core-ingesta
   topics:
-    normales: fog/lecturas/normales
-    criticas: fog/alertas/criticas
+    # normales: fog/lecturas/normales
+    # criticas: fog/alertas/criticas
+    lecturas: "fog/lecturas/#,planta1/limpio/#"
+    alertas: "fog/alertas/#,planta1/alarma/#"
+    notificaciones: interno/notificaciones/criticas
 
 #Swagger / OpenAPI
 springdoc:
@@ -44,3 +47,10 @@ springdoc:
     path: /docs
   api-docs:
     path: /v3/api-docs
+
+# Política de alertas
+alertas:
+  correo-desde-nodo: false        # alarmas que publica el nodo fog: se guardan y se muestran, sin correo
+  correo-desde-motor: true        # alertas del motor de reglas NOM-172: sí envían correo
+  enfriamiento-minutos: 60        # no repetir si el nodo ya tuvo una alerta igual o más grave en este tiempo (0 = desactivado)
+  antiguedad-maxima-minutos: 30   # eventos más viejos que esto se guardan sin avisar (0 = desactivado)

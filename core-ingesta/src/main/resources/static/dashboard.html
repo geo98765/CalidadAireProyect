@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calidad del Aire — Panel en Tiempo Real</title>
-<link rel="stylesheet" href="css/dashboard.css?v=5">
+<link rel="stylesheet" href="css/dashboard.css?v=7">
 </head>
 <body>
 
@@ -22,18 +22,26 @@
       <div class="stat-row" id="statRow">
         <div class="stat-card">
           <div class="label">CO2</div>
-          <div class="value">— <span class="unit">ppm</span></div>
+          <div class="value" id="valCo2">— <span class="unit">ppm</span></div>
         </div>
         <div class="stat-card">
           <div class="label">PM2.5</div>
-          <div class="value">— <span class="unit">µg/m³</span></div>
+          <div class="value" id="valPm25">— <span class="unit">µg/m³</span></div>
         </div>
         <div class="stat-card">
           <div class="label">PM10</div>
-          <div class="value">— <span class="unit">µg/m³</span></div>
+          <div class="value" id="valPm10">— <span class="unit">µg/m³</span></div>
         </div>
         <div class="stat-card">
-          <div class="label">Nivel de riesgo</div>
+          <div class="label">Temperatura</div>
+          <div class="value" id="valTemp">— <span class="unit">°C</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Humedad</div>
+          <div class="value" id="valHum">— <span class="unit">%</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label" title="Nivel de la última lectura que incluyó CO2, PM2.5 o PM10">Nivel de riesgo</div>
           <div class="value"><span class="risk-badge" id="riskBadge">—</span></div>
         </div>
       </div>
@@ -55,6 +63,17 @@
           <canvas id="trendChartPm" role="img" aria-label="Tendencia de PM2.5 y PM10 en las lecturas recientes"></canvas>
         </div>
       </div>
+
+      <div class="card">
+        <h2>Ambiente — <span id="filtroActualAmb" style="color:var(--text-secondary); font-weight:400;">general</span></h2>
+        <div class="legend">
+          <span><i style="background:#a78bfa"></i>Temperatura (°C)</span>
+          <span><i style="background:#22d3ee"></i>Humedad (%)</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="trendChartAmb" role="img" aria-label="Tendencia de temperatura y humedad en las lecturas recientes"></canvas>
+        </div>
+      </div>
     </div>
 
     <div id="historicoPanel" style="display:none;">
@@ -70,6 +89,14 @@
         <div class="stat-card">
           <div class="label">PM10 (promedio)</div>
           <div class="value" id="histPm10Avg">— <span class="unit">µg/m³</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Temperatura (promedio)</div>
+          <div class="value" id="histTempAvg">— <span class="unit">°C</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Humedad (promedio)</div>
+          <div class="value" id="histHumAvg">— <span class="unit">%</span></div>
         </div>
         <div class="stat-card">
           <div class="label">Peor riesgo del periodo</div>
@@ -123,6 +150,17 @@
           <canvas id="historicoChartPm" role="img" aria-label="Histórico de PM2.5 y PM10 en el periodo seleccionado"></canvas>
         </div>
       </div>
+
+      <div class="card">
+        <h2>Histórico — Ambiente</h2>
+        <div class="legend">
+          <span><i style="background:#a78bfa"></i>Temperatura (°C)</span>
+          <span><i style="background:#22d3ee"></i>Humedad (%)</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="historicoChartAmb" role="img" aria-label="Histórico de temperatura y humedad en el periodo seleccionado"></canvas>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -135,14 +173,16 @@
       <h2>Nodos</h2>
       <div id="nodesList"><div class="empty">Cargando nodos…</div></div>
     </div>
-    <div class="card">
+    <div class="card card-info">
       <div id="infoBreve">
-      <h2>¿Qué significan estas señales?</h2>
+        <h2>¿Qué significan estas señales?</h2>
         <p class="info-text info-box info-box-co2"><strong>CO2</strong> — nivel de dióxido de carbono; valores altos indican poca ventilación del espacio.</p>
         <p class="info-text info-box info-box-pm25"><strong>PM2.5</strong> — partículas finas suspendidas, penetran hasta el torrente sanguíneo.</p>
-        <p class="info-text info-box info-box-pm10"><strong>PM10</strong> — partículas más grandes, afectan sobre todo vías respiratorias altas.</p></div>
-      <button class="btn-saber-mas" id="btnSaberMas">Saber más</button>
-      
+        <p class="info-text info-box info-box-pm10"><strong>PM10</strong> — partículas más grandes, afectan sobre todo vías respiratorias altas.</p>
+        <p class="info-text info-box info-box-temp"><strong>Temperatura</strong> — qué tan caliente o fría está el aire; da contexto, pero no cambia el nivel de riesgo.</p>
+        <p class="info-text info-box info-box-hum"><strong>Humedad</strong> — porcentaje de vapor de agua en el aire; si es muy baja o muy alta afecta la comodidad.</p>
+      </div>
+
       <div id="infoDetalle" style="display:none;">
         <div class="variable-detalle variable-detalle-co2">
           <h3>CO2 — Dióxido de carbono</h3>
@@ -191,14 +231,50 @@
             </tbody>
           </table>
         </div>
+
+        <div class="variable-detalle variable-detalle-temp">
+          <h3>Temperatura</h3>
+          <p><strong>Unidad:</strong> °C (grados Celsius)</p>
+          <p>Indica qué tan caliente o fría está el aire del espacio. No forma parte del cálculo del nivel de riesgo, que solo usa CO2, PM2.5 y PM10, pero da contexto: el calor o el frío extremos afectan la comodidad de las personas.</p>
+          <table class="tabla-umbrales">
+            <thead><tr><th>Descripción</th><th>Rango (°C)</th></tr></thead>
+            <tbody>
+              <tr><td class="nivel-bueno">Fresca</td><td>&lt; 18</td></tr>
+              <tr><td class="nivel-bueno">Confortable</td><td>≥ 18 y &lt; 27</td></tr>
+              <tr><td class="nivel-aceptable">Cálida</td><td>≥ 27 y &lt; 33</td></tr>
+              <tr><td class="nivel-malo">Calor alto</td><td>≥ 33 y &lt; 38</td></tr>
+              <tr><td class="nivel-muymalo">Calor extremo</td><td>≥ 38</td></tr>
+            </tbody>
+          </table>
+          <p>Referencia tomada de las alarmas del nodo fog; no son niveles de NOM-172.</p>
+        </div>
+
+        <div class="variable-detalle variable-detalle-hum">
+          <h3>Humedad</h3>
+          <p><strong>Unidad:</strong> % (humedad relativa)</p>
+          <p>Porcentaje de vapor de agua que hay en el aire respecto al máximo que podría contener a esa temperatura. Si es muy baja reseca la piel y las vías respiratorias; si es muy alta favorece el moho y la sensación de bochorno. Tampoco entra en el cálculo del nivel de riesgo.</p>
+          <table class="tabla-umbrales">
+            <thead><tr><th>Descripción</th><th>Rango (%)</th></tr></thead>
+            <tbody>
+              <tr><td class="nivel-aceptable">Baja</td><td>&lt; 30</td></tr>
+              <tr><td class="nivel-bueno">Confortable</td><td>≥ 30 y &lt; 60</td></tr>
+              <tr><td class="nivel-aceptable">Alta</td><td>≥ 60 y &lt; 80</td></tr>
+              <tr><td class="nivel-malo">Muy alta</td><td>≥ 80</td></tr>
+            </tbody>
+          </table>
+          <p>Referencia tomada de las alarmas del nodo fog; no son niveles de NOM-172.</p>
+        </div>
       </div>
+
+      <button class="btn-saber-mas" id="btnSaberMas">Saber más</button>
     </div>
   </aside>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
-<script src="js/dashboard.js?v=5"></script>
+<script src="js/dashboard.js?v=7"></script>
 </body>
 </html>

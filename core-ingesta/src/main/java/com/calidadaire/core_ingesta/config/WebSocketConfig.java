@@ -12,16 +12,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
- 
         config.enableSimpleBroker("/topic");
         config.setApplicationDestinationPrefixes("/app");
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // URL donde se va a conectar shagi
-        registry.addEndpoint("/ws-calidad-aire")
-                .setAllowedOriginPatterns("*") 
-                .withSockJS();
+        // Sin orígenes extra: el dashboard se sirve desde este mismo servicio.
+        // Si algún día el frontend vive en otro dominio, hay que listarlo aquí de forma explícita.
+        registry.addEndpoint("/ws-calidad-aire").withSockJS();
     }
 }

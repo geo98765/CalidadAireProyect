@@ -145,3 +145,8 @@ header h1 { font-size: 18px; font-weight: 500; }
 .variable-detalle-co2 { border-color: #2a78d6; }
 .variable-detalle-pm25 { border-color: #eb6834; }
 .variable-detalle-pm10 { border-color: #1baf7a; }
+
+.info-box-temp { border-color: #a78bfa; }
+.info-box-hum { border-color: #22d3ee; }
+.variable-detalle-temp { border-color: #a78bfa; }
+.variable-detalle-hum { border-color: #22d3ee; }

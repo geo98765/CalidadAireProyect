@@ -41,4 +41,13 @@ public class LecturaNormal {
 
     @Column(name = "nivel_riesgo")
     private String nivelRiesgo;
+
+    @Column(name = "mid", length = 100)
+    private String mid;
+
+    @Column(name = "temperatura_c")
+    private Double temperaturaC;
+
+    @Column(name = "humedad_pct")
+    private Double humedadPct;
 }

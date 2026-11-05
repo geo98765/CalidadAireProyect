@@ -6,11 +6,59 @@ const RISK_COLORS = {
   'EXTREMADAMENTE MALO': '#7e0023'
 };
 
-const MAX_POINTS = 20;
-const trendData = { labels: [], co2: [], pm25: [], pm10: [] };
+const COLORES = { co2: '#2a78d6', pm25: '#eb6834', pm10: '#1baf7a', temp: '#a78bfa', hum: '#22d3ee' };
+const MAX_PUNTOS = 200;   // máximo de puntos por serie en la vista en vivo
+const HORAS_VIVO = 24;    // cuánto histórico se carga al entrar a la vista en vivo
+
+// Una sola definición por variable: campo del API, tarjetas y unidad
+const VARIABLES = {
+  co2:  { campo: 'co2Ppm',       tarjeta: 'valCo2',  promedio: 'histCo2Avg',  unidad: 'ppm' },
+  pm25: { campo: 'pm25Ugm3',     tarjeta: 'valPm25', promedio: 'histPm25Avg', unidad: 'µg/m³' },
+  pm10: { campo: 'pm10Ugm3',     tarjeta: 'valPm10', promedio: 'histPm10Avg', unidad: 'µg/m³' },
+  temp: { campo: 'temperaturaC', tarjeta: 'valTemp', promedio: 'histTempAvg', unidad: '°C' },
+  hum:  { campo: 'humedadPct',   tarjeta: 'valHum',  promedio: 'histHumAvg',  unidad: '%' }
+};
+
 let nodoSeleccionado = 'general';
 let vistaActual = 'live';
+let contadorSeleccion = 0;   // descarta respuestas de selecciones anteriores
+let contadorHistorico = 0;
 
+// ---------- Series de datos ----------
+// Cada serie es una lista de puntos {x: milisegundos, y: valor}. Solo hay puntos para los
+// mensajes que traían esa variable, así que un mensaje parcial no deja huecos en las demás.
+function nuevaSerie() {
+  return { co2: [], pm25: [], pm10: [], temp: [], hum: [] };
+}
+const vivo = nuevaSerie();
+
+function insertarOrdenado(serie, punto) {
+  let i = serie.length;
+  while (i > 0 && serie[i - 1].x > punto.x) i--;
+  serie.splice(i, 0, punto);
+}
+
+function agregarPuntos(series, lectura) {
+  const x = Date.parse(lectura.timestampOrigen);
+  if (Number.isNaN(x)) return;
+  Object.entries(VARIABLES).forEach(([clave, v]) => {
+    if (lectura[v.campo] != null) insertarOrdenado(series[clave], { x, y: lectura[v.campo] });
+  });
+}
+
+function aSeries(datos) {
+  const series = nuevaSerie();
+  datos.forEach(d => agregarPuntos(series, d));
+  return series;
+}
+
+function limitarSeries(series) {
+  Object.values(series).forEach(serie => {
+    while (serie.length > MAX_PUNTOS) serie.shift();
+  });
+}
+
+// ---------- Gráficas ----------
 const crosshairPlugin = {
   id: 'crosshair',
   afterDraw(chartInstance) {
@@ -33,11 +81,26 @@ const crosshairPlugin = {
 };
 Chart.register(crosshairPlugin);
 
+const FORMATOS_TIEMPO = {
+  millisecond: 'HH:mm:ss', second: 'HH:mm:ss', minute: 'HH:mm', hour: 'HH:mm',
+  day: 'dd/MM', week: 'dd/MM', month: 'MM/yyyy', quarter: 'MM/yyyy', year: 'yyyy'
+};
+
+function escalaTiempo() {
+  return {
+    type: 'time',
+    time: { tooltipFormat: 'dd/MM/yyyy HH:mm:ss', displayFormats: FORMATOS_TIEMPO },
+    grid: { display: false },
+    ticks: { color: '#8a93ab', font: { size: 11 }, maxTicksLimit: 8, maxRotation: 0 }
+  };
+}
+
 function opcionesBase() {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
+    // El punto más cercano en el tiempo: las series no comparten los mismos instantes
+    interaction: { mode: 'nearest', axis: 'x', intersect: false },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -51,85 +114,165 @@ function opcionesBase() {
         cornerRadius: 6,
         displayColors: false,
         borderColor: '#232e48',
-        borderWidth: 1
+        borderWidth: 1,
+        callbacks: {
+          label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}${ctx.dataset.unidad ? ' ' + ctx.dataset.unidad : ''}`
+        }
       }
     },
     scales: {
-      y: { grid: { color: '#232e48' }, ticks: { color: '#8a93ab', font: { size: 11 } } },
-      x: { grid: { display: false }, ticks: { color: '#8a93ab', font: { size: 11 }, maxTicksLimit: 8 } }
+      x: escalaTiempo(),
+      y: { grid: { color: '#232e48' }, ticks: { color: '#8a93ab', font: { size: 11 } } }
     }
   };
 }
 
-function datasetLinea(label, color) {
-  return {
-    label, data: [], borderColor: color, backgroundColor: 'transparent',
-    borderWidth: 2, tension: 0.3, pointRadius: 0,
-    pointHoverRadius: 4, pointHoverBackgroundColor: color,
-    pointHoverBorderColor: '#0b0f19', pointHoverBorderWidth: 2
+// Temperatura y humedad tienen unidades distintas: cada una con su propio eje
+function opcionesAmbiente() {
+  const opciones = opcionesBase();
+  delete opciones.scales.y;
+  opciones.scales.yTemp = {
+    position: 'left',
+    grid: { color: '#232e48' },
+    ticks: { color: COLORES.temp, font: { size: 11 }, callback: (v) => `${v}°` }
   };
+  opciones.scales.yHum = {
+    position: 'right',
+    grid: { drawOnChartArea: false },
+    ticks: { color: COLORES.hum, font: { size: 11 }, callback: (v) => `${v}%` }
+  };
+  return opciones;
 }
 
-const chartCo2 = new Chart(document.getElementById('trendChartCo2'), {
-  type: 'line', data: { labels: trendData.labels, datasets: [datasetLinea('CO2', '#2a78d6')] }, options: opcionesBase()
-});
-const chartPm = new Chart(document.getElementById('trendChartPm'), {
-  type: 'line', data: { labels: trendData.labels, datasets: [datasetLinea('PM2.5', '#eb6834'), datasetLinea('PM10', '#1baf7a')] }, options: opcionesBase()
-});
-const historicoChartCo2 = new Chart(document.getElementById('historicoChartCo2'), {
-  type: 'line', data: { labels: [], datasets: [datasetLinea('CO2', '#2a78d6')] }, options: opcionesBase()
-});
-const historicoChartPm = new Chart(document.getElementById('historicoChartPm'), {
-  type: 'line', data: { labels: [], datasets: [datasetLinea('PM2.5', '#eb6834'), datasetLinea('PM10', '#1baf7a')] }, options: opcionesBase()
-});
+function datasetLinea(label, color, unidad, ejeY) {
+  const dataset = {
+    label, unidad, data: [], borderColor: color, backgroundColor: 'transparent',
+    borderWidth: 2, tension: 0.25, spanGaps: true,
+    pointRadius: 2, pointBackgroundColor: color, pointBorderWidth: 0,
+    pointHoverRadius: 5, pointHoverBackgroundColor: color,
+    pointHoverBorderColor: '#0b0f19', pointHoverBorderWidth: 2
+  };
+  if (ejeY) dataset.yAxisID = ejeY;
+  return dataset;
+}
 
-function actualizarTarjetas(lectura) {
-  if (!lectura) return;
-  document.querySelectorAll('.stat-card .value')[0].innerHTML = `${lectura.co2Ppm ?? '—'} <span class="unit">ppm</span>`;
-  document.querySelectorAll('.stat-card .value')[1].innerHTML = `${lectura.pm25Ugm3 ?? '—'} <span class="unit">µg/m³</span>`;
-  document.querySelectorAll('.stat-card .value')[2].innerHTML = `${lectura.pm10Ugm3 ?? '—'} <span class="unit">µg/m³</span>`;
+function crearGrafica(idCanvas, datasets, opciones) {
+  return new Chart(document.getElementById(idCanvas), { type: 'line', data: { datasets }, options: opciones });
+}
 
+const chartCo2 = crearGrafica('trendChartCo2',
+  [datasetLinea('CO2', COLORES.co2, 'ppm')], opcionesBase());
+const chartPm = crearGrafica('trendChartPm',
+  [datasetLinea('PM2.5', COLORES.pm25, 'µg/m³'), datasetLinea('PM10', COLORES.pm10, 'µg/m³')], opcionesBase());
+const chartAmb = crearGrafica('trendChartAmb',
+  [datasetLinea('Temperatura', COLORES.temp, '°C', 'yTemp'), datasetLinea('Humedad', COLORES.hum, '%', 'yHum')],
+  opcionesAmbiente());
+
+const historicoChartCo2 = crearGrafica('historicoChartCo2',
+  [datasetLinea('CO2', COLORES.co2, 'ppm')], opcionesBase());
+const historicoChartPm = crearGrafica('historicoChartPm',
+  [datasetLinea('PM2.5', COLORES.pm25, 'µg/m³'), datasetLinea('PM10', COLORES.pm10, 'µg/m³')], opcionesBase());
+const historicoChartAmb = crearGrafica('historicoChartAmb',
+  [datasetLinea('Temperatura', COLORES.temp, '°C', 'yTemp'), datasetLinea('Humedad', COLORES.hum, '%', 'yHum')],
+  opcionesAmbiente());
+
+function asignarSeries(graficas, series, actualizar) {
+  const [co2, pm, amb] = graficas;
+  co2.data.datasets[0].data = series.co2;
+  pm.data.datasets[0].data = series.pm25;
+  pm.data.datasets[1].data = series.pm10;
+  amb.data.datasets[0].data = series.temp;
+  amb.data.datasets[1].data = series.hum;
+  graficas.forEach(g => g.update(actualizar));
+}
+
+function refrescarVivo() {
+  asignarSeries([chartCo2, chartPm, chartAmb], vivo, 'none');
+}
+
+function mostrarEnHistorico(series) {
+  asignarSeries([historicoChartCo2, historicoChartPm, historicoChartAmb], series);
+}
+
+// ---------- Tarjetas ----------
+function mostrarValor(clave, valor) {
+  const v = VARIABLES[clave];
+  document.getElementById(v.tarjeta).innerHTML = `${valor ?? '—'} <span class="unit">${v.unidad}</span>`;
+}
+
+function mostrarRiesgo(nivel) {
   const badge = document.getElementById('riskBadge');
-  const color = RISK_COLORS[lectura.nivelRiesgo] || '#8a93ab';
-  badge.textContent = lectura.nivelRiesgo || '—';
+  if (!nivel) {
+    badge.textContent = '—';
+    badge.style.background = 'transparent';
+    badge.style.color = 'var(--text-secondary)';
+    return;
+  }
+  const color = RISK_COLORS[nivel] || '#8a93ab';
+  badge.textContent = nivel;
   badge.style.background = color + '22';
   badge.style.color = color;
 }
 
+// Solo actualiza lo que el mensaje trae: un mensaje parcial no borra el resto
+function actualizarTarjetas(lectura) {
+  if (!lectura) return;
+  Object.entries(VARIABLES).forEach(([clave, v]) => {
+    if (lectura[v.campo] != null) mostrarValor(clave, lectura[v.campo]);
+  });
+  if (lectura.nivelRiesgo) mostrarRiesgo(lectura.nivelRiesgo);
+}
+
+function reiniciarTarjetas() {
+  Object.keys(VARIABLES).forEach(clave => mostrarValor(clave, null));
+  mostrarRiesgo(null);
+}
+
+// ---------- Vista en vivo ----------
 function agregarLectura(lectura) {
   if (vistaActual !== 'live') return;
   if (nodoSeleccionado !== 'general' && lectura.nodoId !== nodoSeleccionado) return;
 
-  const hora = new Date(lectura.timestampOrigen || Date.now()).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-  trendData.labels.push(hora);
-  trendData.co2.push(lectura.co2Ppm);
-  trendData.pm25.push(lectura.pm25Ugm3);
-  trendData.pm10.push(lectura.pm10Ugm3);
-  if (trendData.labels.length > MAX_POINTS) {
-    trendData.labels.shift(); trendData.co2.shift(); trendData.pm25.shift(); trendData.pm10.shift();
-  }
-  chartCo2.data.datasets[0].data = trendData.co2;
-  chartPm.data.datasets[0].data = trendData.pm25;
-  chartPm.data.datasets[1].data = trendData.pm10;
-  chartCo2.update('none');
-  chartPm.update('none');
+  agregarPuntos(vivo, lectura);
+  limitarSeries(vivo);
+  refrescarVivo();
   actualizarTarjetas(lectura);
+}
+
+function colorAlerta(tipo) {
+  const t = (tipo || '').toUpperCase();
+  if (t.includes('EXTREMADAMENTE')) return RISK_COLORS['EXTREMADAMENTE MALO'];
+  if (t.includes('MUY_MALO') || t.includes('CRITICO')) return RISK_COLORS['MUY MALO'];
+  if (t.includes('MALO') || t.includes('PELIGRO')) return RISK_COLORS['MALO'];
+  return RISK_COLORS['MUY MALO'];
 }
 
 function agregarAlerta(alerta) {
   const list = document.getElementById('alertsList');
   if (list.querySelector('.empty')) list.innerHTML = '';
-  const color = alerta.tipoAlerta && alerta.tipoAlerta.includes('MUY_MALO') ? RISK_COLORS['MUY MALO'] : '#ef4444';
   const item = document.createElement('div');
   item.className = 'list-item';
   item.innerHTML = `
-    <span class="dot" style="background:${color}"></span>
+    <span class="dot" style="background:${colorAlerta(alerta.tipoAlerta)}"></span>
     <div class="text">
       <div class="title">${alerta.tipoAlerta} — nodo ${(alerta.nodoId || '').toString().slice(0, 8)}</div>
       <div class="meta">${new Date(alerta.timestampOrigen || Date.now()).toLocaleTimeString('es-MX')}</div>
     </div>`;
   list.prepend(item);
   while (list.children.length > 8) list.removeChild(list.lastChild);
+}
+
+function cargarAlertasRecientes() {
+  fetch('/api/v1/alertas/recientes')
+    .then(r => {
+      if (!r.ok) throw new Error(`El servidor respondió ${r.status} al pedir las alertas`);
+      return r.json();
+    })
+    .then(alertas => {
+      // El API las entrega de la más nueva a la más vieja; se agregan al revés para que la más nueva quede arriba
+      alertas.slice(0, 8).reverse().forEach(agregarAlerta);
+    })
+    .catch(err => console.error('No se pudieron cargar las alertas recientes:', err));
 }
 
 function mostrarVistaViva() {
@@ -148,25 +291,22 @@ function mostrarVistaHistorico() {
 function seleccionarNodo(nodoId, etiqueta) {
   mostrarVistaViva();
   nodoSeleccionado = nodoId;
-  document.getElementById('filtroActualCo2').textContent = etiqueta;
-  document.getElementById('filtroActualPm').textContent = etiqueta;
+  ['filtroActualCo2', 'filtroActualPm', 'filtroActualAmb'].forEach(id => {
+    document.getElementById(id).textContent = etiqueta;
+  });
 
   document.querySelectorAll('#nodesList .list-item').forEach(el => {
     el.classList.toggle('selected', el.dataset.nodoId === nodoId);
   });
 
-  trendData.labels.length = 0; trendData.co2.length = 0; trendData.pm25.length = 0; trendData.pm10.length = 0;
-  chartCo2.update('none'); chartPm.update('none');
+  Object.values(vivo).forEach(serie => { serie.length = 0; });
+  refrescarVivo();
+  reiniciarTarjetas();
 
-  document.querySelectorAll('.stat-card .value')[0].innerHTML = `— <span class="unit">ppm</span>`;
-  document.querySelectorAll('.stat-card .value')[1].innerHTML = `— <span class="unit">µg/m³</span>`;
-  document.querySelectorAll('.stat-card .value')[2].innerHTML = `— <span class="unit">µg/m³</span>`;
-  document.getElementById('riskBadge').textContent = '—';
-  document.getElementById('riskBadge').style.background = 'transparent';
-
+  const solicitud = ++contadorSeleccion;
   const url = nodoId === 'general'
-    ? '/api/v1/lecturas/historico?horas=24'
-    : `/api/v1/lecturas/historico?nodoId=${nodoId}&horas=24`;
+    ? `/api/v1/lecturas/historico?horas=${HORAS_VIVO}`
+    : `/api/v1/lecturas/historico?nodoId=${nodoId}&horas=${HORAS_VIVO}`;
 
   fetch(url)
     .then(r => {
@@ -174,15 +314,11 @@ function seleccionarNodo(nodoId, etiqueta) {
       return r.json();
     })
     .then(datos => {
-      datos.slice(-MAX_POINTS).forEach(d => {
-        trendData.labels.push(new Date(d.timestampOrigen).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }));
-        trendData.co2.push(d.co2Ppm); trendData.pm25.push(d.pm25Ugm3); trendData.pm10.push(d.pm10Ugm3);
-      });
-      chartCo2.data.datasets[0].data = trendData.co2;
-      chartPm.data.datasets[0].data = trendData.pm25;
-      chartPm.data.datasets[1].data = trendData.pm10;
-      chartCo2.update('none'); chartPm.update('none');
-      if (datos.length) actualizarTarjetas(datos[datos.length - 1]);
+      if (solicitud !== contadorSeleccion) return;   // el usuario ya cambió de nodo
+      datos.forEach(d => agregarPuntos(vivo, d));
+      limitarSeries(vivo);
+      refrescarVivo();
+      datos.forEach(d => actualizarTarjetas(d));     // deja el último valor conocido de cada variable
     })
     .catch(err => console.error('No se pudo cargar el histórico del nodo:', err));
 }
@@ -194,15 +330,20 @@ function seleccionarHistorico() {
   mostrarVistaHistorico();
 }
 
-function actualizarResumenHistorico(datos) {
-  const co2Vals = datos.map(d => d.co2Ppm).filter(v => v != null);
-  const pm25Vals = datos.map(d => d.pm25Ugm3).filter(v => v != null);
-  const pm10Vals = datos.map(d => d.pm10Ugm3).filter(v => v != null);
-  const promedio = (arr) => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1) : '—';
+// ---------- Vista de histórico ----------
+function mostrarPromedio(id, valores, unidad) {
+  const promedio = valores.length
+    ? (valores.reduce((a, b) => a + b, 0) / valores.length).toFixed(1)
+    : '—';
+  document.getElementById(id).innerHTML = `${promedio} <span class="unit">${unidad}</span>`;
+}
 
-  document.getElementById('histCo2Avg').innerHTML = `${promedio(co2Vals)} <span class="unit">ppm</span>`;
-  document.getElementById('histPm25Avg').innerHTML = `${promedio(pm25Vals)} <span class="unit">µg/m³</span>`;
-  document.getElementById('histPm10Avg').innerHTML = `${promedio(pm10Vals)} <span class="unit">µg/m³</span>`;
+// Promedio simple de las lecturas recibidas en el periodo (no ponderado por tiempo)
+function actualizarResumenHistorico(datos) {
+  Object.values(VARIABLES).forEach(v => {
+    const valores = datos.map(d => d[v.campo]).filter(x => x != null);
+    mostrarPromedio(v.promedio, valores, v.unidad);
+  });
 
   const PRIORIDAD_RIESGO = { 'BUENO': 0, 'ACEPTABLE': 1, 'MALO': 2, 'MUY MALO': 3, 'EXTREMADAMENTE MALO': 4 };
   let peorNivel = null;
@@ -235,28 +376,25 @@ function cargarHistoricoConFiltros() {
     const desde = document.getElementById('fechaDesde').value;
     const hasta = document.getElementById('fechaHasta').value;
     if (!desde || !hasta) return;
-    params.set('desde', desde); params.set('hasta', hasta);
+    params.set('desde', desde);
+    params.set('hasta', hasta);
   } else {
     const horasPorPeriodo = { '24h': 24, 'semana': 168, 'mes': 720 };
     params.set('horas', horasPorPeriodo[periodo] || 24);
   }
 
+  const solicitud = ++contadorHistorico;
   fetch(`/api/v1/lecturas/historico?${params.toString()}`)
     .then(r => {
       if (!r.ok) throw new Error(`El servidor respondió ${r.status} al pedir el histórico`);
       return r.json();
     })
     .then(datos => {
-      const labels = datos.map(d => new Date(d.timestampOrigen).toLocaleString('es-MX', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }));
-      historicoChartCo2.data.labels = labels;
-      historicoChartCo2.data.datasets[0].data = datos.map(d => d.co2Ppm);
-      historicoChartPm.data.labels = labels;
-      historicoChartPm.data.datasets[0].data = datos.map(d => d.pm25Ugm3);
-      historicoChartPm.data.datasets[1].data = datos.map(d => d.pm10Ugm3);
-      historicoChartCo2.update(); historicoChartPm.update();
+      if (solicitud !== contadorHistorico) return;   // llegó una consulta más reciente
+      mostrarEnHistorico(aSeries(datos));
       actualizarResumenHistorico(datos);
     })
-    .catch(err => console.error('No se pudo cargar el historico:', err));
+    .catch(err => console.error('No se pudo cargar el histórico:', err));
 }
 
 function configurarLimitesFecha() {
@@ -306,20 +444,19 @@ document.getElementById('fechaHasta').addEventListener('change', (e) => {
   cargarHistoricoConFiltros();
 });
 
+// ---------- Recuadro "Saber más" ----------
 document.getElementById('btnSaberMas').addEventListener('click', () => {
   const breve = document.getElementById('infoBreve');
   const detalle = document.getElementById('infoDetalle');
   const boton = document.getElementById('btnSaberMas');
-  const tarjeta = boton.closest('.card');
   const expandido = detalle.style.display !== 'none';
 
   breve.style.display = expandido ? '' : 'none';
   detalle.style.display = expandido ? 'none' : '';
   boton.textContent = expandido ? 'Saber más' : 'Ver menos';
-
-  tarjeta.appendChild(boton);
 });
 
+// ---------- Conexión y nodos ----------
 function conectar() {
   const socket = new SockJS('/ws-calidad-aire');
   const stompClient = Stomp.over(socket);
@@ -379,4 +516,5 @@ function cargarNodos() {
 
 conectar();
 cargarNodos();
+cargarAlertasRecientes();
 seleccionarNodo('general', 'general');
