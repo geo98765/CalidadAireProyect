@@ -54,3 +54,7 @@ alertas:
   correo-desde-motor: true        # alertas del motor de reglas NOM-172: sí envían correo
   enfriamiento-minutos: 60        # no repetir si el nodo ya tuvo una alerta igual o más grave en este tiempo (0 = desactivado)
   antiguedad-maxima-minutos: 30   # eventos más viejos que esto se guardan sin avisar (0 = desactivado)
+
+logging:
+  level:
+    org.springframework.web.socket.config.WebSocketMessageBrokerStats: WARN
